@@ -13,6 +13,12 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
 import java.util.concurrent.TimeUnit
 
+// @JvmSuppressWildcards evita que kotlin.collections.Map<K, out V> (covariante en V)
+// emita wildcards "?" en la firma JVM de estos métodos. Retrofit valida cada parámetro
+// @Body por reflexión Java y rechaza cualquier tipo con wildcard - sin esta anotación
+// falla en runtime con "Parameter type must not include a type variable or wildcard"
+// apenas se invoca el primer método con Map<String, Any> como body (login, signup, etc).
+@JvmSuppressWildcards
 interface SupabaseApi {
     // Auth (GoTrue)
     @POST("auth/v1/token?grant_type=password")
