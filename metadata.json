@@ -1,0 +1,6 @@
+{
+  "name": "Rodríguez Barbería",
+  "description": "Aplicación nativa para gestión de citas, catálogo de productos y administración para Rodríguez Barbería.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
