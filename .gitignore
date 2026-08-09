@@ -1,0 +1,14 @@
+# Credenciales locales — nunca deben subirse al repo
+.env
+
+# Android/Gradle
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
