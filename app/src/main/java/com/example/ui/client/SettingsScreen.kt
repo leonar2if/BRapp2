@@ -163,9 +163,26 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        var showLogoutConfirm by remember { mutableStateOf(false) }
+
+        if (showLogoutConfirm) {
+            AlertDialog(
+                onDismissRequest = { showLogoutConfirm = false },
+                title = { Text("¿Quieres cerrar sesión?") },
+                confirmButton = {
+                    TextButton(onClick = { showLogoutConfirm = false; onLogoutClick() }) {
+                        Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutConfirm = false }) { Text("Cancelar") }
+                }
+            )
+        }
+
         // Logout Button
         OutlinedButton(
-            onClick = onLogoutClick,
+            onClick = { showLogoutConfirm = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),

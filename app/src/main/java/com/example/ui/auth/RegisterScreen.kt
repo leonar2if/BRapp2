@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodels.AuthState
+import com.example.utils.Validators
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,12 +33,16 @@ fun RegisterScreen(
     onResetError: () -> Unit
 ) {
     var phone by remember { mutableStateOf("") }
-    var fullName by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var lastNames by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
     val errorMessage = (authState as? AuthState.Error)?.message
     val isLoading = authState is AuthState.Loading
+    // Internamente se sigue mandando "Nombre Apellidos" como un solo string, que es
+    // el formato que ya espera el resto de la app (profiles.full_name) - punto 2.
+    val fullName = listOf(firstName.trim(), lastNames.trim()).filter { it.isNotEmpty() }.joinToString(" ")
 
     Box(
         modifier = Modifier
@@ -98,9 +103,24 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = phone,
-                        onValueChange = { phone = it; if (errorMessage != null) onResetError() },
+                        onValueChange = { newValue ->
+                            phone = newValue.filter { it.isDigit() }.take(8)
+                            if (errorMessage != null) onResetError()
+                        },
                         label = { Text("Número de teléfono") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                        prefix = {
+                            Text(
+                                Validators.COUNTRY_CODE + " ",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                        },
+                        supportingText = {
+                            if (phone.isNotEmpty() && !Validators.isValidLocalPhone(phone)) {
+                                Text("Debe empezar con 5 y tener 8 dígitos")
+                            }
+                        },
+                        isError = phone.isNotEmpty() && !Validators.isValidLocalPhone(phone),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -110,9 +130,22 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedTextField(
-                        value = fullName,
-                        onValueChange = { fullName = it; if (errorMessage != null) onResetError() },
-                        label = { Text("Nombre completo") },
+                        value = firstName,
+                        onValueChange = { firstName = it; if (errorMessage != null) onResetError() },
+                        label = { Text("Nombre") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = lastNames,
+                        onValueChange = { lastNames = it; if (errorMessage != null) onResetError() },
+                        label = { Text("Apellidos") },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         modifier = Modifier.fillMaxWidth(),
@@ -172,7 +205,7 @@ fun RegisterScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        enabled = !isLoading && phone.isNotBlank() && fullName.isNotBlank() && password.isNotBlank(),
+                        enabled = !isLoading && phone.isNotBlank() && firstName.isNotBlank() && lastNames.isNotBlank() && password.isNotBlank(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         if (isLoading) {

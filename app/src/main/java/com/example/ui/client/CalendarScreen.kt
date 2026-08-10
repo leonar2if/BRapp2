@@ -31,8 +31,19 @@ fun CalendarScreen(
     getDayStatus: (String) -> String // returns "green", "red", "gray"
 ) {
     val currentCalendar = remember { Calendar.getInstance() }
-    var year by remember { mutableStateOf(currentCalendar.get(Calendar.YEAR)) }
-    var month by remember { mutableStateOf(currentCalendar.get(Calendar.MONTH)) }
+    // Rango permitido: mes actual + mes siguiente únicamente (punto 6), calculado
+    // dinámicamente a partir de "hoy", nunca hardcodeado a un mes concreto.
+    val minYear = currentCalendar.get(Calendar.YEAR)
+    val minMonth = currentCalendar.get(Calendar.MONTH)
+    val maxCalendar = remember { (currentCalendar.clone() as Calendar).apply { add(Calendar.MONTH, 1) } }
+    val maxYear = maxCalendar.get(Calendar.YEAR)
+    val maxMonth = maxCalendar.get(Calendar.MONTH)
+
+    var year by remember { mutableStateOf(minYear) }
+    var month by remember { mutableStateOf(minMonth) }
+
+    val canGoBack = year > minYear || (year == minYear && month > minMonth)
+    val canGoForward = year < maxYear || (year == maxYear && month < maxMonth)
 
     val calendarInstance = remember(year, month) {
         Calendar.getInstance().apply { set(year, month, 1) }
@@ -80,9 +91,14 @@ fun CalendarScreen(
                             month -= 1
                         }
                     },
+                    enabled = canGoBack,
                     modifier = Modifier.minimumInteractiveComponentSize()
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Mes anterior")
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Mes anterior",
+                        tint = if (canGoBack) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.3f)
+                    )
                 }
 
                 Text(
@@ -99,9 +115,14 @@ fun CalendarScreen(
                             month += 1
                         }
                     },
+                    enabled = canGoForward,
                     modifier = Modifier.minimumInteractiveComponentSize()
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Mes siguiente")
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Mes siguiente",
+                        tint = if (canGoForward) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.3f)
+                    )
                 }
             }
 

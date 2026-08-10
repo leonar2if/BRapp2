@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.utils.DateFormatter
 
 @Composable
 fun TimeSlotWidget(
@@ -63,7 +64,7 @@ fun TimeSlotWidget(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = time,
+                text = DateFormatter.formatTimeForDisplay(time),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp

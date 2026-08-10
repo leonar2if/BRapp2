@@ -47,7 +47,7 @@ fun BookAppointmentScreen(
     val error by viewModel.bookingError.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    val timeSlots = remember { DateFormatter.generateTimeSlots(10, 18, 30) }
+    val timeSlots = remember { DateFormatter.OFFICIAL_TIME_SLOTS }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top header bar depending on step
@@ -426,8 +426,8 @@ fun BookAppointmentScreen(
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
-                                        text = "TICKET #${appt.ticketNumber}",
-                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                                        text = "RESERVA CONFIRMADA",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                                         color = Color.White
                                     )
                                 }
@@ -436,7 +436,7 @@ fun BookAppointmentScreen(
 
                                 Text(text = "📅 ${DateFormatter.formatDayName(appt.appointmentDate)}", style = MaterialTheme.typography.titleMedium)
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text(text = "⏰ Hora: ${appt.appointmentTime.take(5)}", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                                Text(text = "⏰ Hora: ${DateFormatter.formatTimeForDisplay(appt.appointmentTime)}", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(text = "💈 Servicio: ${selectedService?.name ?: "Barbería"}", style = MaterialTheme.typography.bodyLarge)
                                 Spacer(modifier = Modifier.height(6.dp))

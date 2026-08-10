@@ -14,6 +14,7 @@ import com.example.data.repository.ProductRepository
 import com.example.data.repository.SettingsRepository
 import com.example.notifications.LocalNotificationScheduler
 import com.example.utils.DateFormatter
+import com.example.utils.ErrorMessages
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -178,7 +179,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 refreshData()
             } else {
-                _bookingError.value = res.exceptionOrNull()?.message ?: "Error al realizar la reserva."
+                _bookingError.value = ErrorMessages.humanize(res.exceptionOrNull())
             }
         }
     }
@@ -220,10 +221,11 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     fun getDayStatus(dateStr: String): String { // "green"=free, "red"=full, "gray"=no activity/past
         val today = DateFormatter.getTodayDateString()
         if (dateStr < today) return "gray"
-        
+        if (DateFormatter.isWeekend(dateStr)) return "gray"
+
         // Check if store marked as day off in settings
         val dayAppts = _dayAppointments.value.filter { it.appointmentDate == dateStr && it.status != "canceled" }
-        val allSlots = DateFormatter.generateTimeSlots(10, 18, 30)
+        val allSlots = DateFormatter.OFFICIAL_TIME_SLOTS
         return when {
             dayAppts.size >= allSlots.size -> "red"
             dayAppts.isEmpty() -> "green"

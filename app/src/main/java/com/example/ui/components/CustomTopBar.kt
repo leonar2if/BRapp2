@@ -27,6 +27,28 @@ fun CustomTopBar(
     isDarkMode: Boolean = false,
     onLogoutClick: (() -> Unit)? = null
 ) {
+    var showLogoutConfirm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("¿Quieres cerrar sesión?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutConfirm = false
+                    onLogoutClick?.invoke()
+                }) {
+                    Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Surface(
         shadowElevation = 4.dp,
         color = MaterialTheme.colorScheme.surface
@@ -92,7 +114,7 @@ fun CustomTopBar(
                         }
                     }
                     if (onLogoutClick != null) {
-                        IconButton(onClick = onLogoutClick, modifier = Modifier.minimumInteractiveComponentSize()) {
+                        IconButton(onClick = { showLogoutConfirm = true }, modifier = Modifier.minimumInteractiveComponentSize()) {
                             Icon(
                                 imageVector = Icons.Default.ExitToApp,
                                 contentDescription = "Cerrar sesión",

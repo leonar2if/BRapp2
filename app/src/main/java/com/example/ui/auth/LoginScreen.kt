@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodels.AuthState
+import com.example.utils.Validators
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,9 +120,21 @@ fun LoginScreen(
 
                     OutlinedTextField(
                         value = phone,
-                        onValueChange = { phone = it; if (errorMessage != null) onResetError() },
+                        onValueChange = { newValue ->
+                            // Sin límite de longitud a propósito: usuarios ya registrados
+                            // antes de esta regla pueden tener números de otro largo, y el
+                            // login no debe bloquearlos (solo el registro exige 8 dígitos).
+                            phone = newValue.filter { it.isDigit() }
+                            if (errorMessage != null) onResetError()
+                        },
                         label = { Text("Número de teléfono") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                        prefix = {
+                            Text(
+                                Validators.COUNTRY_CODE + " ",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,

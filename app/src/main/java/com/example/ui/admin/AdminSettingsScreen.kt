@@ -241,8 +241,25 @@ fun AdminSettingsScreen(
 
         // Logout
         item {
+            var showLogoutConfirm by remember { mutableStateOf(false) }
+
+            if (showLogoutConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutConfirm = false },
+                    title = { Text("¿Quieres cerrar sesión?") },
+                    confirmButton = {
+                        TextButton(onClick = { showLogoutConfirm = false; onLogout() }) {
+                            Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showLogoutConfirm = false }) { Text("Cancelar") }
+                    }
+                )
+            }
+
             OutlinedButton(
-                onClick = onLogout,
+                onClick = { showLogoutConfirm = true },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)

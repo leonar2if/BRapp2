@@ -46,7 +46,7 @@ fun AdminCalendarScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Calendario Mensual",
+                    text = "Agenda",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -57,7 +57,7 @@ fun AdminCalendarScreen(
                 ) {
                     Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Marcar Día Libre", style = MaterialTheme.typography.labelSmall)
+                    Text("Marcar Día Libre", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
                 }
             }
         }
