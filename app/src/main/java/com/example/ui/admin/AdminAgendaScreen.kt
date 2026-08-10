@@ -32,7 +32,7 @@ fun AdminAgendaScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
 
-    val timeSlots = remember { DateFormatter.generateTimeSlots(10, 18, 30) }
+    val timeSlots = remember { DateFormatter.OFFICIAL_TIME_SLOTS }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // INICIAR DÍA Button Header
@@ -49,7 +49,7 @@ fun AdminAgendaScreen(
             ) {
                 Column {
                     Text(
-                        text = "Agenda de Hoy",
+                        text = "Hoy",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -71,7 +71,7 @@ fun AdminAgendaScreen(
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = "Iniciar Día", tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("INICIAR DÍA", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                    Text("INICIAR DÍA", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -125,7 +125,7 @@ fun AdminAgendaScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = slot,
+                                    text = DateFormatter.formatTimeForDisplay(slot),
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -54,8 +54,8 @@ fun AdminHomeScreen(
                 NavigationBarItem(
                     selected = currentTab == 0,
                     onClick = { currentTab = 0 },
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "Agenda") },
-                    label = { Text("AGENDA", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp)) }
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "Hoy") },
+                    label = { Text("HOY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), maxLines = 1, softWrap = false) }
                 )
                 NavigationBarItem(
                     selected = currentTab == 1,
@@ -72,8 +72,8 @@ fun AdminHomeScreen(
                 NavigationBarItem(
                     selected = currentTab == 3,
                     onClick = { currentTab = 3 },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Calendario") },
-                    label = { Text("CALENDARIO", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp)) }
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Agenda") },
+                    label = { Text("AGENDA", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), maxLines = 1, softWrap = false) }
                 )
                 NavigationBarItem(
                     selected = currentTab == 4,

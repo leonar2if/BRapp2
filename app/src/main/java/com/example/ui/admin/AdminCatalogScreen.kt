@@ -53,7 +53,7 @@ fun AdminCatalogScreen(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Agregar")
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Nuevo")
+                        Text("Nuevo", maxLines = 1, softWrap = false)
                     }
                 }
             }

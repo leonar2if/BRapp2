@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.Profile
 import com.example.data.repository.AuthRepository
+import com.example.utils.ErrorMessages
 import com.example.utils.Validators
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -70,14 +71,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = if (res.isSuccess && profile != null) {
                 AuthState.Success(profile)
             } else {
-                AuthState.Error(res.exceptionOrNull()?.message ?: "Error de autenticación")
+                AuthState.Error(ErrorMessages.humanize(res.exceptionOrNull()))
             }
         }
     }
 
     fun register(phone: String, fullName: String, pass: String, confirmPass: String) {
-        if (!Validators.isValidPhone(phone)) {
-            _authState.value = AuthState.Error("Por favor, introduce un número de teléfono válido.")
+        if (!Validators.isValidLocalPhone(phone)) {
+            _authState.value = AuthState.Error("El número debe empezar con 5 y tener 8 dígitos.")
             return
         }
         if (!Validators.isValidName(fullName)) {
@@ -99,7 +100,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = if (res.isSuccess && profile != null) {
                 AuthState.Success(profile)
             } else {
-                AuthState.Error(res.exceptionOrNull()?.message ?: "Error al registrarse")
+                AuthState.Error(ErrorMessages.humanize(res.exceptionOrNull()))
             }
         }
     }

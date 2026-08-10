@@ -9,26 +9,7 @@ import java.util.UUID
 class AuthService {
     private val api = SupabaseClient.api
 
-    private fun getErrorMessage(e: Throwable): String {
-        return when {
-            e.message?.contains("Unable to resolve host", ignoreCase = true) == true ->
-                "Sin conexión a internet"
-
-            e.message?.contains("401", ignoreCase = true) == true ->
-                "Credenciales incorrectas"
-
-            e.message?.contains("403", ignoreCase = true) == true ->
-                "Acceso denegado por permisos (RLS)"
-
-            e.message?.contains("404", ignoreCase = true) == true ->
-                "Recurso no encontrado"
-
-            e.message?.contains("500", ignoreCase = true) == true ->
-                "Error interno del servidor"
-
-            else -> e.message ?: "Error desconocido"
-        }
-    }
+    private fun getErrorMessage(e: Throwable): String = com.example.utils.ErrorMessages.humanize(e)
 
     suspend fun login(phone: String, pass: String): Result<Profile> = withContext(Dispatchers.IO) {
         try {
