@@ -19,22 +19,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.models.Service
-import com.example.ui.client.CalendarScreen
+import com.example.ui.client.CalendarScreen  // ✅ Import correcto
 import com.example.ui.components.AppointmentCard
 import com.example.ui.components.PhoneField
 import com.example.ui.components.TimeSlotWidget
 import com.example.ui.viewmodels.AdminViewModel
 import com.example.utils.DateFormatter
 import com.example.utils.SlotSchedule
-import com.example.utils.Validators
 
-/**
- * Pestaña "AGENDA" del administrador (antes llamada "Calendario", sección 7
- * del prompt maestro). Calendario mensual (mes actual + siguiente, sección
- * 6) + turnos de un día, con dos formas de visualizarlos (sección 10):
- * vista tipo cliente (idéntica a la del cliente, con permisos de admin) y
- * vista administrativa (listado con acciones, la que ya existía).
- */
 @Composable
 fun AdminCalendarScreen(
     viewModel: AdminViewModel
@@ -48,9 +40,8 @@ fun AdminCalendarScreen(
 
     var showDayOffDialog by remember { mutableStateOf(false) }
     var sendNotification by remember { mutableStateOf(true) }
-    // false = vista administrativa (listado, la que ya existía); true = vista tipo cliente (turnos en grid)
     var clientStyleView by remember { mutableStateOf(true) }
-    var showQuickBookingFor by remember { mutableStateOf<String?>(null) } // hora elegida para reservar
+    var showQuickBookingFor by remember { mutableStateOf<String?>(null) }
 
     val workingDays = remember(workingDaysCsv) { SlotSchedule.parseWorkingDaysCsv(workingDaysCsv) }
 
@@ -87,7 +78,6 @@ fun AdminCalendarScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Selector Vista tipo cliente / Vista administrativa (sección 10)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -113,15 +103,13 @@ fun AdminCalendarScreen(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             item {
-                // ⚠️ Asegúrate de que la función CalendarScreen (en su archivo)
-                // esté anotada con @Composable. Si no lo está, añádesela.
                 CalendarScreen(
                     selectedDate = selectedDate,
                     onDateSelected = { date -> viewModel.selectDate(date) },
                     getDayStatus = { dateStr ->
                         val today = DateFormatter.getTodayDateString()
                         if (dateStr < today) "gray"
-                        else if (!SlotSchedule.isWorkingDay(dateStr, workingDays)) "gray" // fin de semana / no laborable
+                        else if (!SlotSchedule.isWorkingDay(dateStr, workingDays)) "gray"
                         else "green"
                     }
                 )
@@ -137,10 +125,6 @@ fun AdminCalendarScreen(
             }
 
             if (clientStyleView) {
-                // VISTA TIPO CLIENTE: mismos 12 turnos, mismos colores que ve
-                // el cliente (rojo/verde/gris), pero el admin conserva sus
-                // permisos: puede tocar un turno libre y reservarlo, o ver
-                // el turno ocupado.
                 val blockedTimes = remember(blockedSlots) { blockedSlots.map { it.blockTime.take(5) }.toSet() }
                 items(SlotSchedule.DEFAULT_SLOTS) { slot ->
                     val apptForSlot = dateAppts.firstOrNull { it.appointmentTime.take(5) == slot && it.status != "canceled" }
@@ -156,7 +140,6 @@ fun AdminCalendarScreen(
                     )
                 }
             } else {
-                // VISTA ADMINISTRATIVA: listado con acciones (la que ya existía).
                 if (dateAppts.isEmpty()) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -256,13 +239,6 @@ fun AdminCalendarScreen(
     }
 }
 
-/**
- * Reserva rápida del administrador desde la Agenda (sección 11 del prompt
- * maestro). A diferencia del flujo del cliente, el admin NO está obligado a
- * introducir datos personales: solo elige turno (ya elegido al abrir este
- * diálogo) y servicio, y puede confirmar directamente. Nombre y teléfono son
- * opcionales.
- */
 @Composable
 private fun QuickAdminBookingDialog(
     date: String,
