@@ -77,7 +77,9 @@ fun PhotoPickerField(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
                 .clickable {
-                    launcher.launch(ActivityResultContracts.PickVisualMedia.Request(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    // Línea 80 corregida:
+                    // se pasa el filtro ImageOnly directamente, sin usar Request()
+                    launcher.launch(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 },
             contentAlignment = Alignment.Center
         ) {
