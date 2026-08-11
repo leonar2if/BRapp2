@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,42 +36,71 @@ fun PhotoPickerField(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var hasNewSelection by remember { mutableStateOf(false) }
 
-    // ✅ Launcher sin argumentos en el constructor
+    var previewBitmap by remember {
+        mutableStateOf<Bitmap?>(null)
+    }
+
+    var hasNewSelection by remember {
+        mutableStateOf(false)
+    }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
+
         if (uri != null) {
-            val cropped = loadAndCropSquare(context, uri)
+            val cropped = loadAndCropSquare(
+                context,
+                uri
+            )
+
             if (cropped != null) {
                 previewBitmap = cropped
                 hasNewSelection = true
-                onImageSelected(bitmapToJpegBytes(cropped))
+
+                onImageSelected(
+                    bitmapToJpegBytes(cropped)
+                )
             }
         }
     }
 
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+    ) {
         Text(
             text = "Foto",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Bold
+            ),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(6.dp))
+
+        Spacer(
+            modifier = Modifier.height(6.dp)
+        )
 
         Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                .clip(
+                    RoundedCornerShape(12.dp)
+                )
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant
+                )
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline,
+                    RoundedCornerShape(12.dp)
+                )
                 .clickable {
-                    // ✅ Usamos PickVisualMediaRequest correctamente
                     launcher.launch(
-                        ActivityResultContracts.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        PickVisualMediaRequest(
+                            ActivityResultContracts
+                                .PickVisualMedia
+                                .ImageOnly
                         )
                     )
                 },
@@ -85,6 +115,7 @@ fun PhotoPickerField(
                         contentScale = ContentScale.Crop
                     )
                 }
+
                 !existingImageUrl.isNullOrBlank() -> {
                     AsyncImage(
                         model = existingImageUrl,
@@ -93,17 +124,35 @@ fun PhotoPickerField(
                         contentScale = ContentScale.Crop
                     )
                 }
+
                 else -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Toca para elegir", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.AddAPhoto,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(4.dp)
+                        )
+
+                        Text(
+                            "Toca para elegir",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(
+            modifier = Modifier.height(6.dp)
+        )
+
         Text(
             text = "Formato cuadrado 1:1. Se recorta automáticamente.",
             style = MaterialTheme.typography.labelSmall,
@@ -111,31 +160,65 @@ fun PhotoPickerField(
         )
 
         if (hasNewSelection) {
-            TextButton(onClick = {
-                previewBitmap = null
-                hasNewSelection = false
-                onImageSelected(null)
-            }) {
+            TextButton(
+                onClick = {
+                    previewBitmap = null
+                    hasNewSelection = false
+                    onImageSelected(null)
+                }
+            ) {
                 Text("Quitar selección")
             }
         }
     }
 }
 
-private fun loadAndCropSquare(context: Context, uri: Uri): Bitmap? {
+private fun loadAndCropSquare(
+    context: Context,
+    uri: Uri
+): Bitmap? {
     return try {
-        val input = context.contentResolver.openInputStream(uri) ?: return null
-        val original = BitmapFactory.decodeStream(input)
-        input.close()
-        if (original == null) return null
+        val input =
+            context.contentResolver.openInputStream(uri)
+                ?: return null
 
-        val size = min(original.width, original.height)
-        val x = (original.width - size) / 2
-        val y = (original.height - size) / 2
-        val squared = Bitmap.createBitmap(original, x, y, size, size)
+        val original =
+            BitmapFactory.decodeStream(input)
+
+        input.close()
+
+        if (original == null) {
+            return null
+        }
+
+        val size =
+            min(
+                original.width,
+                original.height
+            )
+
+        val x =
+            (original.width - size) / 2
+
+        val y =
+            (original.height - size) / 2
+
+        val squared =
+            Bitmap.createBitmap(
+                original,
+                x,
+                y,
+                size,
+                size
+            )
 
         if (squared.width > 1080) {
-            Bitmap.createScaledBitmap(squared, 1080, 1080, true)
+            Bitmap.createScaledBitmap(
+                squared,
+                1080,
+                1080,
+                true
+            )
         } else {
             squared
         }
@@ -144,8 +227,17 @@ private fun loadAndCropSquare(context: Context, uri: Uri): Bitmap? {
     }
 }
 
-private fun bitmapToJpegBytes(bitmap: Bitmap): ByteArray {
-    val stream = ByteArrayOutputStream()
-    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+private fun bitmapToJpegBytes(
+    bitmap: Bitmap
+): ByteArray {
+    val stream =
+        ByteArrayOutputStream()
+
+    bitmap.compress(
+        Bitmap.CompressFormat.JPEG,
+        90,
+        stream
+    )
+
     return stream.toByteArray()
 }
