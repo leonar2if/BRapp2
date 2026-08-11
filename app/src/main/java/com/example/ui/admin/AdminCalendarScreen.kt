@@ -113,6 +113,8 @@ fun AdminCalendarScreen(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             item {
+                // ⚠️ Asegúrate de que la función CalendarScreen (en su archivo)
+                // esté anotada con @Composable. Si no lo está, añádesela.
                 CalendarScreen(
                     selectedDate = selectedDate,
                     onDateSelected = { date -> viewModel.selectDate(date) },
