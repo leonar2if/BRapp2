@@ -28,17 +28,6 @@ import coil.compose.AsyncImage
 import java.io.ByteArrayOutputStream
 import kotlin.math.min
 
-/**
- * Selector de foto para productos/servicios del catálogo (sección 19 del
- * prompt maestro): reemplaza el campo "URL de imagen" por un flujo de
- * seleccionar-desde-galería + previsualizar + recortar a 1:1.
- *
- * - `existingImageUrl`: URL ya guardada (para editar un producto existente;
- *   se sigue usando esa columna/URL, no se rompe compatibilidad).
- * - `onImageSelected`: entrega los bytes JPEG ya recortados 1:1, listos para
- *   subir con el pipeline existente (ProductService.createProduct /
- *   AdminViewModel.saveProduct), o null si el usuario borra la selección.
- */
 @Composable
 fun PhotoPickerField(
     existingImageUrl: String?,
@@ -77,9 +66,12 @@ fun PhotoPickerField(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
                 .clickable {
-                    // Línea 80 corregida:
-                    // se pasa el filtro ImageOnly directamente, sin usar Request()
-                    launcher.launch(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    // 🔧 Solución correcta:
+                    launcher.launch(
+                        ActivityResultContracts.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -129,7 +121,6 @@ fun PhotoPickerField(
     }
 }
 
-/** Carga la imagen desde la Uri y la recorta centrada a un cuadrado 1:1. */
 private fun loadAndCropSquare(context: Context, uri: Uri): Bitmap? {
     return try {
         val input = context.contentResolver.openInputStream(uri) ?: return null
@@ -142,8 +133,6 @@ private fun loadAndCropSquare(context: Context, uri: Uri): Bitmap? {
         val y = (original.height - size) / 2
         val squared = Bitmap.createBitmap(original, x, y, size, size)
 
-        // Limita el lado máximo para no subir imágenes gigantes (razonable
-        // para catálogo): 1080x1080 como pide el prompt maestro.
         if (squared.width > 1080) {
             Bitmap.createScaledBitmap(squared, 1080, 1080, true)
         } else {
