@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import com.example.data.database.AppDatabase
 import com.example.data.models.Appointment
+import com.example.data.models.BlockedSlot
 import com.example.data.models.Product
 import com.example.data.models.Service
 import com.example.data.repository.AppointmentRepository
@@ -13,7 +14,11 @@ import com.example.data.repository.AuthRepository
 import com.example.data.repository.ProductRepository
 import com.example.data.repository.SettingsRepository
 import com.example.notifications.LocalNotificationScheduler
+import com.example.service.BlockedSlotService
 import com.example.utils.DateFormatter
+import com.example.utils.ErrorTranslator
+import com.example.utils.SlotSchedule
+import com.example.utils.Validators
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -25,6 +30,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val apptRepo = AppointmentRepository()
     private val settingsRepo = SettingsRepository(db.settingsDao())
     private val authRepo = AuthRepository(application)
+    private val blockedSlotService = BlockedSlotService()
 
     val allServices: StateFlow<List<Service>> = productRepo.allServices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -41,18 +47,24 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _allAppointments = MutableStateFlow<List<Appointment>>(emptyList())
     val allAppointments: StateFlow<List<Appointment>> = _allAppointments
 
+    // Turnos bloqueados por el admin para el día seleccionado en Agenda
+    // (botón ⊘, sección 8). Se recargan junto con selectDate/refreshData.
+    private val _selectedDateBlockedSlots = MutableStateFlow<List<BlockedSlot>>(emptyList())
+    val selectedDateBlockedSlots: StateFlow<List<BlockedSlot>> = _selectedDateBlockedSlots
+
+    private val _todayBlockedSlots = MutableStateFlow<List<BlockedSlot>>(emptyList())
+    val todayBlockedSlots: StateFlow<List<BlockedSlot>> = _todayBlockedSlots
+
     private val _selectedDate = MutableStateFlow(DateFormatter.getTodayDateString())
     val selectedDate: StateFlow<String> = _selectedDate
 
-    private val _currentTurnIndex = MutableStateFlow(0)
-    val currentTurnIndex: StateFlow<Int> = _currentTurnIndex
-
-    private val _elapsedSeconds = MutableStateFlow(0L)
-    val elapsedSeconds: StateFlow<Long> = _elapsedSeconds
-    private var timerJob: Job? = null
-
-    private val _currentTurnNotes = MutableStateFlow("")
-    val currentTurnNotes: StateFlow<String> = _currentTurnNotes
+    // Cronómetro independiente por cita (pantalla "Hoy" - vista de galería).
+    // Cada tarjeta puede tener su propio cronómetro corriendo, identificado
+    // por el id de la cita. elapsedByAppointment expone los segundos
+    // transcurridos de cada uno para pintar el timer en su card.
+    private val _elapsedByAppointment = MutableStateFlow<Map<Long, Long>>(emptyMap())
+    val elapsedByAppointment: StateFlow<Map<Long, Long>> = _elapsedByAppointment
+    private val timerJobs = mutableMapOf<Long, Job>()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -69,6 +81,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _storeHours = MutableStateFlow("Lunes a Viernes 10:00 - 18:00")
     val storeHours: StateFlow<String> = _storeHours
 
+    // Días laborables configurables (sección 16/17 del prompt maestro).
+    // Se guarda en settings.working_days como CSV de códigos de 3 letras
+    // (MON,TUE,WED,THU,FRI). Compatible con el JSON sembrado en
+    // supabase_update_bloque1.sql: el parseo tolera ambos formatos.
+    private val _workingDaysCsv = MutableStateFlow("MON,TUE,WED,THU,FRI")
+    val workingDaysCsv: StateFlow<String> = _workingDaysCsv
+
     init {
         refreshData()
     }
@@ -79,11 +98,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             val today = DateFormatter.getTodayDateString()
             val todayList = apptRepo.fetchAppointmentsByDate(today)
             _todayAppointments.value = todayList.sortedBy { it.appointmentTime }
-            
+            _todayBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(today)
+
             if (_selectedDate.value == today) {
                 _selectedDateAppointments.value = _todayAppointments.value
+                _selectedDateBlockedSlots.value = _todayBlockedSlots.value
             } else {
                 _selectedDateAppointments.value = apptRepo.fetchAppointmentsByDate(_selectedDate.value)
+                _selectedDateBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(_selectedDate.value)
             }
 
             val hist = apptRepo.fetchAllAppointments()
@@ -96,6 +118,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             _managerPhone.value = settingsRepo.getSettingValue("manager_phone", "34600000000")
             _managerName.value = settingsRepo.getSettingValue("manager_name", "Gestor Rodríguez")
             _storeHours.value = settingsRepo.getSettingValue("store_hours", "Lunes a Viernes 10:00 - 18:00")
+            _workingDaysCsv.value = normalizeWorkingDaysValue(
+                settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
+            )
             
             _isLoading.value = false
         }
@@ -106,91 +131,131 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             _selectedDateAppointments.value = apptRepo.fetchAppointmentsByDate(date)
+            _selectedDateBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(date)
             _isLoading.value = false
         }
     }
 
-    fun startTurnExecution() {
-        val list = _todayAppointments.value.filter { it.status == "confirmed" || it.status == "in_progress" }
-        if (list.isNotEmpty()) {
-            _currentTurnIndex.value = 0
-            val currentAppt = list[0]
-            _currentTurnNotes.value = currentAppt.notes ?: ""
-            startTimer()
+    /**
+     * Botón ⊘ "Libre el resto del día" (sección 8 del prompt maestro).
+     * fromTime = null -> bloquea TODOS los turnos restantes desde ahora.
+     * fromTime = "14:00" -> bloquea ese turno y todos los siguientes; los
+     * turnos anteriores quedan intactos.
+     * No bloquea turnos que ya tienen una cita confirmada (esos no se tocan;
+     * el admin puede cancelarlos aparte si hace falta).
+     */
+    fun blockRestOfDay(date: String, fromTime: String?) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val adminId = authRepo.userId.first()
+            val allSlots = SlotSchedule.DEFAULT_SLOTS
+            val nowTime = DateFormatter.getNowTimeString()
+            val startFrom = fromTime ?: allSlots.firstOrNull { it > nowTime } ?: allSlots.last()
+            val startIndex = allSlots.indexOf(startFrom).let { if (it == -1) 0 else it }
+            val occupiedTimes = (if (date == DateFormatter.getTodayDateString()) _todayAppointments.value else _selectedDateAppointments.value)
+                .filter { it.status != "canceled" }
+                .map { it.appointmentTime.take(5) }
+                .toSet()
+            val slotsToBlock = allSlots.subList(startIndex, allSlots.size).filter { it !in occupiedTimes }
+
+            if (slotsToBlock.isNotEmpty()) {
+                blockedSlotService.blockSlots(date, slotsToBlock, adminId)
+            }
+            refreshData()
+            _isLoading.value = false
         }
     }
 
-    private fun startTimer() {
-        timerJob?.cancel()
-        _elapsedSeconds.value = 0L
-        timerJob = viewModelScope.launch {
+    /** Revierte el bloqueo ⊘ del día indicado. */
+    fun clearBlockedSlots(date: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            blockedSlotService.clearDayBlocks(date)
+            refreshData()
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Reserva rápida del administrador desde la Agenda (sección 11 del
+     * prompt maestro): a diferencia del flujo del cliente, el admin NO está
+     * obligado a introducir datos personales. Nombre/teléfono son opcionales.
+     */
+    fun createQuickAdminAppointment(
+        date: String,
+        time: String,
+        service: Service,
+        name: String,
+        phone: String
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            val adminId = authRepo.userId.first()
+            val cleanPhone = if (phone.isNotBlank() && Validators.isValidLocalPhone(phone)) {
+                Validators.cleanPhoneNumber(phone)
+            } else {
+                ""
+            }
+            val appt = Appointment(
+                clientId = "admin_walkin_$adminId",
+                serviceId = service.id,
+                fullName = name.ifBlank { "Cliente sin registrar" },
+                phone = cleanPhone,
+                isAnnexed = false,
+                appointmentDate = date,
+                appointmentTime = time,
+                status = "confirmed",
+                createdByAdmin = true
+            )
+            val res = apptRepo.createAppointment(appt, service.durationSlots)
+            if (res.isFailure) {
+                _errorMessage.value = ErrorTranslator.toHumanMessage(res.exceptionOrNull())
+            }
+            refreshData()
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Cronómetro por card (pantalla "Hoy" - vista de galería). Cada cita
+     * tiene su propio contador independiente identificado por su id, para
+     * que el admin pueda iniciarlo desde cualquier turno del carrusel y ver
+     * cuánto duró ese pelado en particular.
+     */
+    fun startCardTimer(appointmentId: Long) {
+        timerJobs[appointmentId]?.cancel()
+        timerJobs[appointmentId] = viewModelScope.launch {
             while (true) {
                 delay(1000)
-                _elapsedSeconds.value += 1
+                val current = _elapsedByAppointment.value
+                _elapsedByAppointment.value = current + (appointmentId to (current[appointmentId] ?: 0L) + 1)
             }
         }
     }
 
-    fun finalizeCurrentTurn() {
-        viewModelScope.launch {
-            val list = _todayAppointments.value.filter { it.status == "confirmed" || it.status == "in_progress" }
-            if (list.isNotEmpty() && _currentTurnIndex.value < list.size) {
-                val current = list[_currentTurnIndex.value]
-                val adminId = authRepo.userId.first()
-                
-                // Save notes
-                apptRepo.updateNotes(current.id, _currentTurnNotes.value)
-                // Mark attended
-                apptRepo.markAsAttended(current.id, adminId)
+    fun pauseCardTimer(appointmentId: Long) {
+        timerJobs[appointmentId]?.cancel()
+        timerJobs.remove(appointmentId)
+    }
 
-                // Check next turn
-                if (_currentTurnIndex.value + 1 < list.size) {
-                    _currentTurnIndex.value += 1
-                    val next = list[_currentTurnIndex.value]
-                    _currentTurnNotes.value = next.notes ?: ""
-                    startTimer()
-                } else {
-                    timerJob?.cancel()
-                }
-                refreshData()
-            }
+    fun isCardTimerRunning(appointmentId: Long): Boolean = timerJobs[appointmentId] != null
+
+    /** Guarda la nota de una cita puntual (identificada por id), sin depender de un índice secuencial. */
+    fun updateNotesForAppointment(appointmentId: Long, notes: String) {
+        // Actualización optimista para que el campo de texto no "salte" mientras se guarda.
+        _todayAppointments.value = _todayAppointments.value.map {
+            if (it.id == appointmentId) it.copy(notes = notes) else it
+        }
+        viewModelScope.launch {
+            apptRepo.updateNotes(appointmentId, notes)
         }
     }
 
-    fun updateCurrentNotes(notes: String) {
-        _currentTurnNotes.value = notes
-        viewModelScope.launch {
-            val list = _todayAppointments.value.filter { it.status == "confirmed" || it.status == "in_progress" }
-            if (list.isNotEmpty() && _currentTurnIndex.value < list.size) {
-                apptRepo.updateNotes(list[_currentTurnIndex.value].id, notes)
-            }
-        }
-    }
-
-    fun rescheduleCurrentToNextMonth() {
-        viewModelScope.launch {
-            val list = _todayAppointments.value.filter { it.status == "confirmed" || it.status == "in_progress" }
-            if (list.isNotEmpty() && _currentTurnIndex.value < list.size) {
-                val current = list[_currentTurnIndex.value]
-                val adminId = authRepo.userId.first()
-                LocalNotificationScheduler.cancelAppointmentReminders(getApplication(), current.id.toString())
-                val res = apptRepo.rescheduleNextMonth(current, adminId)
-                val newAppt = res.getOrNull()
-                if (res.isSuccess && newAppt != null) {
-                    val serviceName = allServices.value.find { it.id == newAppt.serviceId }?.name ?: "servicio"
-                    LocalNotificationScheduler.createNotificationChannel(getApplication())
-                    LocalNotificationScheduler.scheduleAppointmentReminders(
-                        context = getApplication(),
-                        appointmentId = newAppt.id.toString(),
-                        appointmentDate = newAppt.appointmentDate,
-                        appointmentTime = newAppt.appointmentTime,
-                        clientName = newAppt.fullName,
-                        serviceName = serviceName
-                    )
-                }
-                finalizeCurrentTurn()
-            }
-        }
+    /** Marca como atendido y detiene su cronómetro si estaba corriendo (botón FINALIZADO de la card). */
+    fun finalizeAppointment(appointmentId: Long) {
+        pauseCardTimer(appointmentId)
+        markAsAttended(appointmentId)
     }
 
     fun cancelAppointment(appointmentId: Long) {
@@ -284,6 +349,38 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             settingsRepo.saveSetting("store_hours", hours)
             _storeHours.value = hours
+        }
+    }
+
+    /**
+     * Guarda los días laborables elegidos por el admin (sección 16/17).
+     * Recibe un Set de códigos ("MON","TUE",...) y lo persiste como CSV en
+     * settings.working_days, reutilizando la misma tabla/patrón que el resto
+     * de ajustes (manager_phone, store_hours), sin crear estructuras nuevas.
+     */
+    fun saveWorkingDays(days: Set<String>) {
+        viewModelScope.launch {
+            val csv = days.joinToString(",")
+            settingsRepo.saveSetting("working_days", csv)
+            _workingDaysCsv.value = csv
+        }
+    }
+
+    /**
+     * Acepta tanto el formato JSON sembrado por supabase_update_bloque1.sql
+     * (ej. ["MON","TUE","WED","THU","FRI"]) como CSV simple (MON,TUE,...),
+     * para no depender de cuál de los dos haya quedado guardado.
+     */
+    private fun normalizeWorkingDaysValue(raw: String): String {
+        val cleaned = raw.trim()
+        return if (cleaned.startsWith("[")) {
+            cleaned.removePrefix("[").removeSuffix("]")
+                .split(",")
+                .map { it.trim().trim('"') }
+                .filter { it.isNotBlank() }
+                .joinToString(",")
+        } else {
+            cleaned
         }
     }
 

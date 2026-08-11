@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.models.Product
+import com.example.ui.components.PhotoPickerField
 import com.example.ui.components.ProductCard
 import com.example.ui.viewmodels.AdminViewModel
 
@@ -42,17 +43,24 @@ fun AdminCatalogScreen(
                     Text(
                         text = "Gestión de Catálogo (${products.size})",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.weight(1f, fill = false),
                         color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
                             editingProduct = null
                             showDialog = true
                         },
-                        shape = RoundedCornerShape(12.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.wrapContentWidth()
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Agregar")
                         Spacer(modifier = Modifier.width(4.dp))
+                        // Texto en una sola línea garantizado: el botón usa
+                        // wrapContentWidth (crece según su contenido) en vez
+                        // de un ancho fijo que forzaba el wrap ("Nu"/"evo").
                         Text("Nuevo", maxLines = 1, softWrap = false)
                     }
                 }
@@ -84,7 +92,10 @@ fun AdminCatalogScreen(
         var description by remember { mutableStateOf(editingProduct?.description ?: "") }
         var price by remember { mutableStateOf(editingProduct?.price?.toString() ?: "10.0") }
         var isActive by remember { mutableStateOf(editingProduct?.isActive ?: true) }
-        var imageUrl by remember { mutableStateOf(editingProduct?.imageUrl1 ?: "") }
+        // Bytes de la nueva foto elegida (1:1, ya recortada por PhotoPickerField).
+        // Si es null y hay editingProduct, se conserva la imageUrl1 existente
+        // (compatibilidad con productos que ya tenían una URL guardada).
+        var newImageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -121,13 +132,10 @@ fun AdminCatalogScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = imageUrl,
-                        onValueChange = { imageUrl = it },
-                        label = { Text("URL de imagen (o dejar en blanco)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PhotoPickerField(
+                        existingImageUrl = editingProduct?.imageUrl1,
+                        onImageSelected = { bytes -> newImageBytes = bytes }
                     )
 
                     if (editingProduct != null) {
@@ -152,10 +160,13 @@ fun AdminCatalogScreen(
                                 name = name,
                                 description = description,
                                 price = price.toDoubleOrNull() ?: 10.0,
-                                imageUrl1 = if (imageUrl.isNotBlank()) imageUrl else null,
+                                imageUrl1 = editingProduct?.imageUrl1, // se sobreescribe con la URL nueva tras subir, si hay foto nueva
                                 isActive = isActive
                             )
-                            viewModel.saveProduct(p)
+                            val filename = if (newImageBytes != null) {
+                                "product_${System.currentTimeMillis()}.jpg"
+                            } else null
+                            viewModel.saveProduct(p, newImageBytes, filename)
                             showDialog = false
                         }
                     }

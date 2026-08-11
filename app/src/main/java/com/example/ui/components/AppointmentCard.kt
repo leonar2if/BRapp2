@@ -69,6 +69,8 @@ fun AppointmentCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // El cliente no debe ver el número de ticket interno
+                    // (sección 14). Solo el admin lo ve, para gestión interna.
                     if (isAdmin) {
                         Box(
                             modifier = Modifier
@@ -85,7 +87,7 @@ fun AppointmentCard(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = com.example.utils.DateFormatter.formatTimeForDisplay(appointment.appointmentTime),
+                        text = appointment.appointmentTime.take(5),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )

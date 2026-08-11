@@ -138,6 +138,18 @@ interface SupabaseApi {
         @Path("filename") filename: String,
         @Body fileBody: RequestBody
     ): Map<String, Any>?
+
+    // Blocked Slots (botón ⊘ "Libre el resto del día", sección 8)
+    @GET("rest/v1/blocked_slots")
+    suspend fun getBlockedSlotsByDate(
+        @Query("block_date") date: String
+    ): List<BlockedSlot>
+
+    @POST("rest/v1/blocked_slots")
+    suspend fun createBlockedSlots(@Body slots: List<BlockedSlot>): List<BlockedSlot>
+
+    @DELETE("rest/v1/blocked_slots")
+    suspend fun deleteBlockedSlotsByDate(@Query("block_date") date: String)
 }
 
 data class AuthResponse(

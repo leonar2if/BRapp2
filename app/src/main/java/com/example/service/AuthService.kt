@@ -9,7 +9,16 @@ import java.util.UUID
 class AuthService {
     private val api = SupabaseClient.api
 
-    private fun getErrorMessage(e: Throwable): String = com.example.utils.ErrorMessages.humanize(e)
+    // NOTA (auditoría / sección 3 del prompt maestro): este servicio ya NO traduce
+    // errores a texto humano localmente. Antes tenía su propia getErrorMessage()
+    // duplicando lógica; ahora deja pasar el mensaje técnico original (para logs
+    // de desarrollador) y la traducción a lenguaje humano se hace en un único
+    // lugar: com.example.utils.ErrorTranslator, justo antes de mostrarse en UI
+    // (AuthViewModel). Esto evita tener dos implementaciones paralelas de
+    // traducción de errores.
+    private fun getErrorMessage(e: Throwable): String {
+        return e.message ?: "Error desconocido"
+    }
 
     suspend fun login(phone: String, pass: String): Result<Profile> = withContext(Dispatchers.IO) {
         try {

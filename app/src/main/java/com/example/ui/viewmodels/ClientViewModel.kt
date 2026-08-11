@@ -14,7 +14,8 @@ import com.example.data.repository.ProductRepository
 import com.example.data.repository.SettingsRepository
 import com.example.notifications.LocalNotificationScheduler
 import com.example.utils.DateFormatter
-import com.example.utils.ErrorMessages
+import com.example.utils.ErrorTranslator
+import com.example.utils.SlotSchedule
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -65,6 +66,10 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     private val _storeHours = MutableStateFlow("10:00 - 18:00")
     val storeHours: StateFlow<String> = _storeHours
 
+    // Días laborables configurables desde Ajustes -> Horarios (admin).
+    // Por defecto lunes a viernes hasta que se cargue el valor real de settings.
+    private val _workingDays = MutableStateFlow(SlotSchedule.DEFAULT_WORKING_DAYS)
+
     init {
         refreshData()
     }
@@ -85,6 +90,9 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
             _managerPhone.value = phone
             val hours = settingsRepo.getSettingValue("store_hours", "10:00 - 18:00")
             _storeHours.value = hours
+            _workingDays.value = SlotSchedule.parseWorkingDaysCsv(
+                settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
+            )
             
             fetchDaySlots(_selectedDate.value)
             _isLoading.value = false
@@ -110,6 +118,25 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectService(service: Service) {
+        // Antes de avanzar a confirmar, comprobar que el rango completo de
+        // turnos que ocupa este servicio (no solo el turno elegido) siga
+        // libre. Un servicio de N turnos debe bloquear los N, y esto evita
+        // que el cliente llegue a confirmar una cita que en realidad choca
+        // con otra reserva en el segundo/tercer turno. Sección 12.
+        val range = com.example.utils.SlotSchedule.slotRangeFor(_selectedTime.value, service.durationSlots)
+        if (range == null) {
+            _bookingError.value = "Este servicio no cabe en el horario restante del día. Elige otra hora."
+            _selectedTime.value = ""
+            _bookingStep.value = 1
+            return
+        }
+        val occupiedInRange = range.any { isSlotOccupied(it) }
+        if (occupiedInRange) {
+            _bookingError.value = "Este servicio necesita ${service.durationSlots} turnos consecutivos y alguno ya está ocupado. Elige otra hora."
+            _selectedTime.value = ""
+            _bookingStep.value = 1
+            return
+        }
         _selectedService.value = service
         _bookingStep.value = 3 // Move to confirm screen
     }
@@ -147,13 +174,19 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
                 return@launch
             }
 
+            if (isForOther && !com.example.utils.Validators.isValidLocalPhone(otherPhone)) {
+                _bookingError.value = "El número de teléfono debe empezar por 5 y tener 8 dígitos."
+                _isLoading.value = false
+                return@launch
+            }
+
             val appt = Appointment(
                 clientId = if (isForOther) "annexed_$userId" else userId,
                 serviceId = service.id,
                 fullName = if (isForOther) otherName else userFullName,
                 lastName1 = if (isForOther) otherLastName1 else null,
                 lastName2 = if (isForOther) otherLastName2 else null,
-                phone = if (isForOther) otherPhone else userPhone,
+                phone = if (isForOther) com.example.utils.Validators.cleanPhoneNumber(otherPhone) else userPhone,
                 isAnnexed = isForOther,
                 mainClientId = if (isForOther) userId else null,
                 appointmentDate = _selectedDate.value,
@@ -162,7 +195,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
                 createdByAdmin = false
             )
 
-            val res = apptRepo.createAppointment(appt)
+            val res = apptRepo.createAppointment(appt, service.durationSlots)
             _isLoading.value = false
             val booked = res.getOrNull()
             if (res.isSuccess && booked != null) {
@@ -179,7 +212,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 refreshData()
             } else {
-                _bookingError.value = ErrorMessages.humanize(res.exceptionOrNull())
+                _bookingError.value = ErrorTranslator.toHumanMessage(res.exceptionOrNull())
             }
         }
     }
@@ -212,20 +245,27 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
 
     fun isSlotOccupied(time: String): Boolean {
         val appts = _dayAppointments.value
-        val prefix = time.take(5)
-        return appts.any { 
-            it.appointmentTime.startsWith(prefix) && it.status != "canceled"
+        val services = activeServices.value
+        return appts.any { appt ->
+            if (appt.status == "canceled") return@any false
+            // Turnos que ocupa esta cita: su propio turno de inicio +
+            // (durationSlots - 1) turnos siguientes, según el servicio
+            // reservado. Así un servicio de 2+ turnos bloquea todos los
+            // turnos que ocupa, no solo el primero (sección 12).
+            val durationSlots = services.find { it.id == appt.serviceId }?.durationSlots ?: 1
+            val range = com.example.utils.SlotSchedule.slotRangeFor(appt.appointmentTime.take(5), durationSlots)
+                ?: listOf(appt.appointmentTime.take(5))
+            time.take(5) in range
         }
     }
 
-    fun getDayStatus(dateStr: String): String { // "green"=free, "red"=full, "gray"=no activity/past
+    fun getDayStatus(dateStr: String): String { // "green"=free, "red"=full, "gray"=no activity/past/no laborable
         val today = DateFormatter.getTodayDateString()
         if (dateStr < today) return "gray"
-        if (DateFormatter.isWeekend(dateStr)) return "gray"
+        if (!SlotSchedule.isWorkingDay(dateStr, _workingDays.value)) return "gray" // fin de semana / día no laborable
 
-        // Check if store marked as day off in settings
         val dayAppts = _dayAppointments.value.filter { it.appointmentDate == dateStr && it.status != "canceled" }
-        val allSlots = DateFormatter.OFFICIAL_TIME_SLOTS
+        val allSlots = SlotSchedule.DEFAULT_SLOTS
         return when {
             dayAppts.size >= allSlots.size -> "red"
             dayAppts.isEmpty() -> "green"

@@ -31,28 +31,10 @@ fun CustomTopBar(
     isDarkMode: Boolean = false,
     onLogoutClick: (() -> Unit)? = null
 ) {
-    // Línea 30 corregida: ahora usa los imports y es más clara
+    // Confirmación de logout centralizada aquí: CustomTopBar es el punto de
+    // entrada del ícono de logout tanto para cliente como para administrador,
+    // así se evita duplicar el diálogo en cada pantalla que la use.
     var showLogoutConfirm by remember { mutableStateOf(false) }
-
-    if (showLogoutConfirm) {
-        AlertDialog(
-            onDismissRequest = { showLogoutConfirm = false },
-            title = { Text("¿Quieres cerrar sesión?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showLogoutConfirm = false
-                    onLogoutClick?.invoke()
-                }) {
-                    Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }) {
-                    Text("Cancelar")
-                }
-            }
-        )
-    }
 
     Surface(
         shadowElevation = 4.dp,
@@ -130,5 +112,15 @@ fun CustomTopBar(
                 }
             }
         }
+    }
+
+    if (showLogoutConfirm && onLogoutClick != null) {
+        LogoutConfirmDialog(
+            onConfirm = {
+                showLogoutConfirm = false
+                onLogoutClick()
+            },
+            onDismiss = { showLogoutConfirm = false }
+        )
     }
 }

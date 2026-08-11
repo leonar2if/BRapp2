@@ -61,6 +61,24 @@ class AppointmentService {
         }
     }
 
+    /**
+     * Comprueba que TODOS los turnos del rango [time, time + durationSlots)
+     * estén libres, no solo el primero. Necesario para servicios que ocupan
+     * más de un turno (sección 12 del prompt maestro). No hardcodea "2":
+     * durationSlots viene siempre de Service.durationSlots.
+     */
+    suspend fun isRangeAvailable(date: String, time: String, durationSlots: Int): Boolean = withContext(Dispatchers.IO) {
+        val range = com.example.utils.SlotSchedule.slotRangeFor(time, durationSlots)
+            ?: return@withContext false // el servicio no cabe en los turnos del día
+        try {
+            val appts = api.getAppointmentsByDate("eq.$date")
+            val bookedTimes = appts.filter { it.status != "canceled" }.map { it.appointmentTime.take(5) }.toSet()
+            range.none { it in bookedTimes }
+        } catch (e: Exception) {
+            true
+        }
+    }
+
     suspend fun isTimeAvailable(date: String, time: String, serviceId: Long): Boolean = withContext(Dispatchers.IO) {
         try {
             val avail = api.isTimeAvailable(mapOf("p_date" to date, "p_time" to time, "p_service_id" to serviceId))
@@ -77,8 +95,17 @@ class AppointmentService {
         }
     }
 
-    suspend fun createAppointment(appointment: Appointment): Result<Appointment> = withContext(Dispatchers.IO) {
+    suspend fun createAppointment(appointment: Appointment, durationSlots: Int = 1): Result<Appointment> = withContext(Dispatchers.IO) {
         try {
+            // Comprobar que el rango completo de turnos que ocupa el servicio
+            // esté libre (no solo el primer turno). Sección 12 del prompt maestro.
+            if (durationSlots > 1) {
+                val available = isRangeAvailable(appointment.appointmentDate, appointment.appointmentTime, durationSlots)
+                if (!available) {
+                    return@withContext Result.failure(Exception("Ese horario ya no está disponible para la duración de este servicio."))
+                }
+            }
+
             // Check client active reservations limit: max 1 as titular + max 1 as annexed
             val clientAppts = getClientAppointments(appointment.clientId).filter { 
                 it.status == "confirmed" || it.status == "in_progress" 

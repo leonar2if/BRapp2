@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.PhoneField
 import com.example.ui.viewmodels.AuthState
 import com.example.utils.Validators
 
@@ -118,27 +119,10 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    OutlinedTextField(
+                    PhoneField(
                         value = phone,
-                        onValueChange = { newValue ->
-                            // Sin límite de longitud a propósito: usuarios ya registrados
-                            // antes de esta regla pueden tener números de otro largo, y el
-                            // login no debe bloquearlos (solo el registro exige 8 dígitos).
-                            phone = newValue.filter { it.isDigit() }
-                            if (errorMessage != null) onResetError()
-                        },
-                        label = { Text("Número de teléfono") },
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                        prefix = {
-                            Text(
-                                Validators.COUNTRY_CODE + " ",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                            )
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        onValueChange = { phone = it; if (errorMessage != null) onResetError() },
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -179,7 +163,7 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        enabled = !isLoading && phone.isNotBlank() && password.isNotBlank(),
+                        enabled = !isLoading && Validators.isValidLocalPhone(phone) && password.isNotBlank(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         if (isLoading) {

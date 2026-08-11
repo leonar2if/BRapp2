@@ -23,7 +23,7 @@ fun AdminHomeScreen(
     authViewModel: AuthViewModel,
     onLogout: () -> Unit
 ) {
-    var currentTab by remember { mutableStateOf(0) } // 0=AGENDA, 1=SERVICIOS, 2=CATÁLOGO, 3=CALENDARIO, 4=AJUSTES
+    var currentTab by remember { mutableStateOf(0) } // 0=HOY, 1=SERVICIOS, 2=CATÁLOGO, 3=AGENDA, 4=AJUSTES
     var isManagingTurns by remember { mutableStateOf(false) }
 
     val isDarkMode by authViewModel.isDarkMode.collectAsState()
@@ -55,7 +55,7 @@ fun AdminHomeScreen(
                     selected = currentTab == 0,
                     onClick = { currentTab = 0 },
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "Hoy") },
-                    label = { Text("HOY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), maxLines = 1, softWrap = false) }
+                    label = { Text("HOY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp)) }
                 )
                 NavigationBarItem(
                     selected = currentTab == 1,
@@ -73,7 +73,7 @@ fun AdminHomeScreen(
                     selected = currentTab == 3,
                     onClick = { currentTab = 3 },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = "Agenda") },
-                    label = { Text("AGENDA", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), maxLines = 1, softWrap = false) }
+                    label = { Text("AGENDA", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp)) }
                 )
                 NavigationBarItem(
                     selected = currentTab == 4,
@@ -91,6 +91,9 @@ fun AdminHomeScreen(
         ) {
             when (currentTab) {
                 0 -> {
+                    // Pestaña "HOY": operación del día actual (antes llamada "Agenda").
+                    // Archivo físico AdminAgendaScreen.kt sin renombrar para no romper
+                    // referencias; el nombre visible al usuario ya es "Hoy".
                     AdminAgendaScreen(
                         viewModel = adminViewModel,
                         onStartDayClick = { isManagingTurns = true }
@@ -103,6 +106,9 @@ fun AdminHomeScreen(
                     AdminCatalogScreen(viewModel = adminViewModel)
                 }
                 3 -> {
+                    // Pestaña "AGENDA": calendario mensual + turnos de un día
+                    // (antes llamada "Calendario"). Archivo físico
+                    // AdminCalendarScreen.kt sin renombrar por el mismo motivo.
                     AdminCalendarScreen(viewModel = adminViewModel)
                 }
                 4 -> {

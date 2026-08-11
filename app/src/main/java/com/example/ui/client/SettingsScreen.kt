@@ -20,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.ui.components.PhoneField
+import com.example.utils.Validators
 
 @Composable
 fun SettingsScreen(
@@ -30,8 +32,9 @@ fun SettingsScreen(
     onChangePasswordClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
-    var phoneInput by remember(currentPhone) { mutableStateOf(currentPhone) }
+    var phoneInput by remember(currentPhone) { mutableStateOf(Validators.toLocalDisplay(currentPhone)) }
     var isEditingPhone by remember { mutableStateOf(false) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Column(
@@ -75,37 +78,36 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (isEditingPhone) {
-                    OutlinedTextField(
+                    PhoneField(
                         value = phoneInput,
                         onValueChange = { phoneInput = it },
-                        label = { Text("Nuevo teléfono") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        label = "Nuevo teléfono",
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        TextButton(onClick = { isEditingPhone = false; phoneInput = currentPhone }) {
+                        TextButton(onClick = { isEditingPhone = false; phoneInput = Validators.toLocalDisplay(currentPhone) }) {
                             Text("Cancelar")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                if (phoneInput.isNotBlank()) {
-                                    onUpdatePhone(phoneInput)
+                                if (Validators.isValidLocalPhone(phoneInput)) {
+                                    onUpdatePhone(Validators.cleanPhoneNumber(phoneInput))
                                     isEditingPhone = false
                                 }
-                            }
+                            },
+                            enabled = Validators.isValidLocalPhone(phoneInput)
                         ) {
                             Text("Guardar")
                         }
                     }
                 } else {
                     Text(
-                        text = currentPhone.ifBlank { "No configurado" },
+                        text = if (currentPhone.isBlank()) "No configurado" else "${Validators.COUNTRY_CODE} ${Validators.toLocalDisplay(currentPhone)}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -163,23 +165,6 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        var showLogoutConfirm by remember { mutableStateOf(false) }
-
-        if (showLogoutConfirm) {
-            AlertDialog(
-                onDismissRequest = { showLogoutConfirm = false },
-                title = { Text("¿Quieres cerrar sesión?") },
-                confirmButton = {
-                    TextButton(onClick = { showLogoutConfirm = false; onLogoutClick() }) {
-                        Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showLogoutConfirm = false }) { Text("Cancelar") }
-                }
-            )
-        }
-
         // Logout Button
         OutlinedButton(
             onClick = { showLogoutConfirm = true },
@@ -193,5 +178,15 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text("Cerrar Sesión", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         }
+    }
+
+    if (showLogoutConfirm) {
+        com.example.ui.components.LogoutConfirmDialog(
+            onConfirm = {
+                showLogoutConfirm = false
+                onLogoutClick()
+            },
+            onDismiss = { showLogoutConfirm = false }
+        )
     }
 }

@@ -43,14 +43,18 @@ fun AdminServicesScreen(
                     Text(
                         text = "Gestión de Servicios (${services.size})",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.weight(1f, fill = false),
                         color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
                             editingService = null
                             showDialog = true
                         },
-                        shape = RoundedCornerShape(12.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.wrapContentWidth()
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Agregar")
                         Spacer(modifier = Modifier.width(4.dp))

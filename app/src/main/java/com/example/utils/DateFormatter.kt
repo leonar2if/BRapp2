@@ -12,28 +12,6 @@ object DateFormatter {
     private val displayDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     private val displayMonthYear = SimpleDateFormat("MMMM yyyy", Locale("es", "ES"))
     private val displayDayName = SimpleDateFormat("EEEE d 'de' MMMM", Locale("es", "ES"))
-    private val time12hFormat = SimpleDateFormat("h:mm a", Locale("es", "ES"))
-
-    // Los 12 turnos oficiales actuales (punto 4/26 del spec). No se generan por rango
-    // porque hay un corte de almuerzo irregular (11:30 -> 13:30) que un simple
-    // start/end/interval no puede representar. Se guardan como lista explícita para
-    // poder mostrarla/editarla desde Ajustes -> Horarios en el futuro (punto 17) sin
-    // tocar esta función; por ahora es el único punto de la app que los define.
-    val OFFICIAL_TIME_SLOTS: List<String> = listOf(
-        "10:00", "10:30", "11:00", "11:30",
-        "13:30", "14:00", "14:30", "15:00",
-        "16:00", "16:30", "17:00", "17:30"
-    )
-
-    /** "13:00" -> "1:00 PM", "09:30" -> "9:30 AM". Acepta "HH:mm" o "HH:mm:ss". */
-    fun formatTimeForDisplay(time: String): String {
-        return try {
-            val parsed = timeFormat.parse(time.take(5)) ?: return time
-            time12hFormat.format(parsed).uppercase(Locale("es", "ES"))
-        } catch (e: Exception) {
-            time
-        }
-    }
 
     fun getTodayDateString(): String {
         return dateFormat.format(Date())
@@ -99,15 +77,6 @@ object DateFormatter {
         } catch (e: Exception) {
             getTodayDateString()
         }
-    }
-
-    /** true para sábado/domingo. Días no laborables actuales (punto 5 del spec). */
-    fun isWeekend(dateStr: String): Boolean {
-        val date = stringToDate(dateStr) ?: return false
-        val cal = Calendar.getInstance()
-        cal.time = date
-        val dow = cal.get(Calendar.DAY_OF_WEEK)
-        return dow == Calendar.SATURDAY || dow == Calendar.SUNDAY
     }
 
     fun generateTimeSlots(startHour: Int = 10, endHour: Int = 18, intervalMinutes: Int = 30): List<String> {

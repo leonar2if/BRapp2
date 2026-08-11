@@ -26,10 +26,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.AppointmentCard
+import com.example.ui.components.PhoneField
 import com.example.ui.components.ServiceCard
 import com.example.ui.components.TimeSlotWidget
 import com.example.ui.viewmodels.ClientViewModel
 import com.example.utils.DateFormatter
+import com.example.utils.SlotSchedule
+import com.example.utils.Validators
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +50,7 @@ fun BookAppointmentScreen(
     val error by viewModel.bookingError.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    val timeSlots = remember { DateFormatter.OFFICIAL_TIME_SLOTS }
+    val timeSlots = remember { SlotSchedule.DEFAULT_SLOTS }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top header bar depending on step
@@ -321,15 +324,10 @@ fun BookAppointmentScreen(
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                OutlinedTextField(
+                                PhoneField(
                                     value = otherPhone,
                                     onValueChange = { otherPhone = it },
-                                    label = { Text("Teléfono") },
-                                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(12.dp)
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
@@ -425,8 +423,12 @@ fun BookAppointmentScreen(
                                         .background(Color(0xFF2E7D32))
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
+                                    // El cliente NO debe ver el ticket/ID interno de la
+                                    // reserva (sección 14 del prompt maestro). El número
+                                    // sigue existiendo en appt.ticketNumber y el
+                                    // administrador puede seguir usándolo internamente.
                                     Text(
-                                        text = "RESERVA CONFIRMADA",
+                                        text = "✓ RESERVA CONFIRMADA",
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                                         color = Color.White
                                     )
@@ -436,7 +438,7 @@ fun BookAppointmentScreen(
 
                                 Text(text = "📅 ${DateFormatter.formatDayName(appt.appointmentDate)}", style = MaterialTheme.typography.titleMedium)
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text(text = "⏰ Hora: ${DateFormatter.formatTimeForDisplay(appt.appointmentTime)}", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                                Text(text = "⏰ Hora: ${appt.appointmentTime.take(5)}", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(text = "💈 Servicio: ${selectedService?.name ?: "Barbería"}", style = MaterialTheme.typography.bodyLarge)
                                 Spacer(modifier = Modifier.height(6.dp))

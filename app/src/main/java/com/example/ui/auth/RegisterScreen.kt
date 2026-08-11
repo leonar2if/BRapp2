@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.PhoneField
 import com.example.ui.viewmodels.AuthState
 import com.example.utils.Validators
 
@@ -33,16 +34,21 @@ fun RegisterScreen(
     onResetError: () -> Unit
 ) {
     var phone by remember { mutableStateOf("") }
+    // Nombre y apellidos se muestran como dos campos independientes (sección 2
+    // del prompt maestro), pero internamente se siguen combinando en un único
+    // "full_name" ("Nombre + espacio + Apellidos") para no romper compatibilidad
+    // con Profile.fullName / la columna profiles.full_name ya existente.
     var firstName by remember { mutableStateOf("") }
     var lastNames by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
+    val fullName = listOf(firstName.trim(), lastNames.trim())
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+
     val errorMessage = (authState as? AuthState.Error)?.message
     val isLoading = authState is AuthState.Loading
-    // Internamente se sigue mandando "Nombre Apellidos" como un solo string, que es
-    // el formato que ya espera el resto de la app (profiles.full_name) - punto 2.
-    val fullName = listOf(firstName.trim(), lastNames.trim()).filter { it.isNotEmpty() }.joinToString(" ")
 
     Box(
         modifier = Modifier
@@ -101,30 +107,10 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    OutlinedTextField(
+                    PhoneField(
                         value = phone,
-                        onValueChange = { newValue ->
-                            phone = newValue.filter { it.isDigit() }.take(8)
-                            if (errorMessage != null) onResetError()
-                        },
-                        label = { Text("Número de teléfono") },
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                        prefix = {
-                            Text(
-                                Validators.COUNTRY_CODE + " ",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                            )
-                        },
-                        supportingText = {
-                            if (phone.isNotEmpty() && !Validators.isValidLocalPhone(phone)) {
-                                Text("Debe empezar con 5 y tener 8 dígitos")
-                            }
-                        },
-                        isError = phone.isNotEmpty() && !Validators.isValidLocalPhone(phone),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        onValueChange = { phone = it; if (errorMessage != null) onResetError() },
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -205,7 +191,8 @@ fun RegisterScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        enabled = !isLoading && phone.isNotBlank() && firstName.isNotBlank() && lastNames.isNotBlank() && password.isNotBlank(),
+                        enabled = !isLoading && Validators.isValidLocalPhone(phone) &&
+                                firstName.isNotBlank() && lastNames.isNotBlank() && password.isNotBlank(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         if (isLoading) {

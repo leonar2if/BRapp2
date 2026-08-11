@@ -14,31 +14,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.utils.DateFormatter
 
 @Composable
 fun TimeSlotWidget(
     time: String,
     isOccupied: Boolean,
     isSelected: Boolean = false,
+    isBlocked: Boolean = false, // turno bloqueado por el admin (⊘), sin cita
     onClick: () -> Unit
 ) {
+    val effectivelyUnavailable = isOccupied || isBlocked
+
     val borderColor = when {
         isSelected -> MaterialTheme.colorScheme.primary
+        isBlocked -> Color.Gray
         isOccupied -> Color(0xFFC62828) // Red
         else -> Color(0xFF2E7D32) // Green
     }
 
     val backgroundColor = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer
+        isBlocked -> Color.Gray.copy(alpha = 0.12f)
         isOccupied -> Color(0xFFC62828).copy(alpha = 0.1f)
         else -> Color(0xFF2E7D32).copy(alpha = 0.1f)
-    }
-
-    val textColor = when {
-        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-        isOccupied -> Color(0xFFC62828)
-        else -> Color(0xFF2E7D32)
     }
 
     Box(
@@ -52,7 +50,7 @@ fun TimeSlotWidget(
                 color = borderColor,
                 shape = RoundedCornerShape(10.dp)
             )
-            .clickable(enabled = !isOccupied) { onClick() }
+            .clickable(enabled = !effectivelyUnavailable) { onClick() }
             .minimumInteractiveComponentSize(),
         contentAlignment = Alignment.Center
     ) {
@@ -64,7 +62,7 @@ fun TimeSlotWidget(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = DateFormatter.formatTimeForDisplay(time),
+                text = time,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
@@ -73,11 +71,19 @@ fun TimeSlotWidget(
             )
 
             Surface(
-                color = if (isOccupied) Color(0xFFC62828) else Color(0xFF2E7D32),
+                color = when {
+                    isBlocked -> Color.Gray
+                    isOccupied -> Color(0xFFC62828)
+                    else -> Color(0xFF2E7D32)
+                },
                 shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
-                    text = if (isOccupied) "RESERVADO" else "LIBRE",
+                    text = when {
+                        isBlocked -> "NO DISPONIBLE"
+                        isOccupied -> "RESERVADO"
+                        else -> "LIBRE"
+                    },
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.DateFormatter
+import com.example.utils.SlotSchedule
 import java.util.Calendar
 
 @Composable
@@ -31,19 +32,30 @@ fun CalendarScreen(
     getDayStatus: (String) -> String // returns "green", "red", "gray"
 ) {
     val currentCalendar = remember { Calendar.getInstance() }
-    // Rango permitido: mes actual + mes siguiente únicamente (punto 6), calculado
-    // dinámicamente a partir de "hoy", nunca hardcodeado a un mes concreto.
-    val minYear = currentCalendar.get(Calendar.YEAR)
-    val minMonth = currentCalendar.get(Calendar.MONTH)
-    val maxCalendar = remember { (currentCalendar.clone() as Calendar).apply { add(Calendar.MONTH, 1) } }
-    val maxYear = maxCalendar.get(Calendar.YEAR)
-    val maxMonth = maxCalendar.get(Calendar.MONTH)
+    var year by remember { mutableStateOf(currentCalendar.get(Calendar.YEAR)) }
+    var month by remember { mutableStateOf(currentCalendar.get(Calendar.MONTH)) }
 
-    var year by remember { mutableStateOf(minYear) }
-    var month by remember { mutableStateOf(minMonth) }
-
-    val canGoBack = year > minYear || (year == minYear && month > minMonth)
-    val canGoForward = year < maxYear || (year == maxYear && month < maxMonth)
+    // Calendario limitado a mes actual + siguiente (sección 6 del prompt
+    // maestro). El rango se calcula dinámicamente cada vez (no hardcodeado
+    // a agosto/septiembre): SlotSchedule.navigableMonths() siempre devuelve
+    // el mes de "hoy" y el mes siguiente relativos a la fecha real del
+    // dispositivo.
+    val navigableMonths = remember { SlotSchedule.navigableMonths() }
+    val canGoPrevious = remember(year, month) {
+        navigableMonths.any { (y, m) ->
+            // Se puede retroceder solo si el mes anterior sigue siendo navegable
+            val prevMonth = if (month == 0) 11 else month - 1
+            val prevYear = if (month == 0) year - 1 else year
+            y == prevYear && m == prevMonth
+        }
+    }
+    val canGoNext = remember(year, month) {
+        navigableMonths.any { (y, m) ->
+            val nextMonth = if (month == 11) 0 else month + 1
+            val nextYear = if (month == 11) year + 1 else year
+            y == nextYear && m == nextMonth
+        }
+    }
 
     val calendarInstance = remember(year, month) {
         Calendar.getInstance().apply { set(year, month, 1) }
@@ -91,13 +103,13 @@ fun CalendarScreen(
                             month -= 1
                         }
                     },
-                    enabled = canGoBack,
+                    enabled = canGoPrevious,
                     modifier = Modifier.minimumInteractiveComponentSize()
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Mes anterior",
-                        tint = if (canGoBack) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.3f)
+                        tint = if (canGoPrevious) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.3f)
                     )
                 }
 
@@ -115,13 +127,13 @@ fun CalendarScreen(
                             month += 1
                         }
                     },
-                    enabled = canGoForward,
+                    enabled = canGoNext,
                     modifier = Modifier.minimumInteractiveComponentSize()
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "Mes siguiente",
-                        tint = if (canGoForward) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.3f)
+                        tint = if (canGoNext) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.3f)
                     )
                 }
             }

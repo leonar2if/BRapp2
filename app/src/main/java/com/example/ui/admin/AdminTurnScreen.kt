@@ -2,319 +2,153 @@ package com.example.ui.admin
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.data.models.Appointment
 import com.example.ui.viewmodels.AdminViewModel
+import com.example.utils.DateFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Pestaña "HOY" del administrador — ESTADO ACTIVO. Lista de los 12 turnos
+ * del día con su estado visual (libre / ocupado / actual / pasado /
+ * cancelado); al tocar una card se abre la galería de detalle en carrusel
+ * (swipe) sobre todos los turnos del día, con las acciones de cada cita.
+ */
 @Composable
 fun AdminTurnScreen(
     viewModel: AdminViewModel,
     onBackClick: () -> Unit
 ) {
     val todayAppts by viewModel.todayAppointments.collectAsState()
-    val currentIndex by viewModel.currentTurnIndex.collectAsState()
-    val elapsedSec by viewModel.elapsedSeconds.collectAsState()
-    val notes by viewModel.currentTurnNotes.collectAsState()
     val services by viewModel.allServices.collectAsState()
-    val context = LocalContext.current
 
+    var showBlockDialog by remember { mutableStateOf(false) }
     var showEndDayDialog by remember { mutableStateOf(false) }
+    var galleryStartIndex by remember { mutableStateOf<Int?>(null) }
 
-    val activeList = remember(todayAppts) {
-        todayAppts.filter { it.status == "confirmed" || it.status == "in_progress" }
-    }
-
-    val currentTurn = if (activeList.isNotEmpty() && currentIndex < activeList.size) {
-        activeList[currentIndex]
-    } else null
-
-    val currentService = currentTurn?.let { appt ->
-        services.find { it.id == appt.serviceId }?.name ?: "Servicio de Barbería"
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Top bar
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            shadowElevation = 2.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                    Text(
-                        text = "Gestión de Turnos",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-
-                Button(
-                    onClick = { showEndDayDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("FINALIZAR DÍA", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
-                }
-            }
+    // Refresco del "ahora" cada 30s para que el turno ACTUAL avance sin
+    // tener que salir y volver a entrar a la pantalla.
+    var nowTick by remember { mutableStateOf(DateFormatter.getNowTimeString()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            nowTick = DateFormatter.getNowTimeString()
         }
+    }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            if (currentTurn == null) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = "Listo", tint = Color(0xFF2E7D32), modifier = Modifier.size(56.dp))
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "¡No hay más turnos pendientes por hoy!",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Puedes finalizar el día o volver a la agenda para revisar el historial.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            } else {
-                item {
-                    // Turno actual Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "TURNO ACTUAL #${currentTurn.ticketNumber}",
-                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
+    val items = remember(todayAppts, nowTick) { TodaySlotBuilder.build(todayAppts, nowTick) }
 
-                                // Timer display
-                                val mins = elapsedSec / 60
-                                val secs = elapsedSec % 60
-                                val timeStr = String.format("%02d:%02d", mins, secs)
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surface,
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text(
-                                        text = "⏱️ $timeStr",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
+    if (galleryStartIndex != null) {
+        TodayGallery(
+            items = items,
+            startIndex = galleryStartIndex!!,
+            services = services,
+            viewModel = viewModel,
+            onClose = { galleryStartIndex = null }
+        )
+        return
+    }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                text = currentTurn.fullName,
-                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "💈 $currentService | ⏰ ${currentTurn.appointmentTime.take(5)}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "📞 Tel: ${currentTurn.phone}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Notes field
-                            OutlinedTextField(
-                                value = notes,
-                                onValueChange = { viewModel.updateCurrentNotes(it) },
-                                label = { Text("Notas del cliente (hasta 200 palabras)") },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 100.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Action buttons
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val cleanPhone = currentTurn.phone.replace(" ", "").replace("+", "")
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone"))
-                                        context.startActivity(intent)
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Llamar")
-                                }
-
-                                OutlinedButton(
-                                    onClick = { viewModel.rescheduleCurrentToNextMonth() },
-                                    modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.secondary,
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Próx. Mes")
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = { viewModel.finalizeCurrentTurn() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                            ) {
-                                Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("⏭️ FINALIZAR TURNO", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "Lista de Turnos del Día:",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
-            // List of all turns of today
-            itemsIndexed(todayAppts) { index, appt ->
-                val statusSymbol = when {
-                    appt.status == "attended" -> "✅ Atendido"
-                    appt.status == "canceled" -> "❌ Cancelado"
-                    index == currentIndex && activeList.contains(appt) -> "🔴 ACTUAL"
-                    else -> "⏳ Pendiente"
-                }
-
-                Card(
+    Scaffold(
+        topBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shadowElevation = 2.dp
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (statusSymbol.contains("ACTUAL")) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                    )
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "#${appt.ticketNumber} | ${appt.appointmentTime.take(5)} - ${appt.fullName}",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                            val sName = services.find { it.id == appt.serviceId }?.name ?: "Barbería"
-                            Text(text = sName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                         }
                         Text(
-                            text = statusSymbol,
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = when {
-                                statusSymbol.contains("Atendido") -> Color(0xFF2E7D32)
-                                statusSymbol.contains("ACTUAL") -> MaterialTheme.colorScheme.primary
-                                else -> Color.Gray
-                            }
+                            text = "Hoy",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                    IconButton(onClick = { showBlockDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Block,
+                            contentDescription = "Tomarse libre el resto del día",
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showEndDayDialog = true },
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = Color.White
+            ) {
+                Text("FINALIZAR DÍA", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 96.dp)
+        ) {
+            itemsIndexed(items) { index, item ->
+                TodaySlotRow(
+                    item = item,
+                    onCheckClick = {
+                        item.appointment?.let { viewModel.finalizeAppointment(it.id) }
+                    },
+                    onCardClick = { galleryStartIndex = index }
+                )
+            }
         }
+    }
+
+    if (showBlockDialog) {
+        val today = remember { DateFormatter.getTodayDateString() }
+        BlockRestOfDayDialog(
+            timeSlots = com.example.utils.SlotSchedule.DEFAULT_SLOTS,
+            currentTime = DateFormatter.getNowTimeString(),
+            onDismiss = { showBlockDialog = false },
+            onConfirm = { fromTime ->
+                viewModel.blockRestOfDay(today, fromTime)
+                showBlockDialog = false
+            }
+        )
     }
 
     if (showEndDayDialog) {
@@ -360,6 +194,476 @@ fun AdminTurnScreen(
             dismissButton = {
                 TextButton(onClick = { showEndDayDialog = false }) {
                     Text("Volver")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TodaySlotRow(
+    item: TodaySlotItem,
+    onCheckClick: () -> Unit,
+    onCardClick: () -> Unit
+) {
+    val (tagText, tagColor) = when (item.tag) {
+        TagKind.LIBRE -> "LIBRE" to Color(0xFF2E7D32)
+        TagKind.OCUPADO -> "OCUPADO" to Color(0xFFC62828)
+        TagKind.ACTUAL -> "ACTUAL" to Color(0xFFF9A825)
+        TagKind.PASADO -> "PASADO" to Color.Gray
+        TagKind.CANCELADO -> "CANCELADO" to Color.Gray
+    }
+
+    val cardModifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp)
+        .let {
+            if (item.isCurrent) it.border(2.dp, Color(0xFFF9A825), RoundedCornerShape(10.dp)) else it
+        }
+        .clickable(enabled = item.appointment != null) { onCardClick() }
+
+    Card(
+        modifier = cardModifier,
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Izquierda: hora + ícono de estado
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.time,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                when (item.icon) {
+                    IconKind.PENDING_CLOCK -> Icon(
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = "Pendiente de confirmar",
+                        tint = Color(0xFFF9A825),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    IconKind.CONFIRMED_CHECK -> Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Confirmado",
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    IconKind.CANCELED_X -> Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cancelado",
+                        tint = Color(0xFFC62828),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    IconKind.NONE -> {}
+                }
+                if (item.appointment != null) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = item.appointment.fullName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Derecha: tag de color
+            Surface(
+                color = tagColor.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = tagText,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = tagColor,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            // Extremo derecho: botón check de finalizar
+            if (item.showCheckButton) {
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(onClick = onCheckClick, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Marcar atendido",
+                        tint = Color(0xFF2E7D32)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TodayGallery(
+    items: List<TodaySlotItem>,
+    startIndex: Int,
+    services: List<com.example.data.models.Service>,
+    viewModel: AdminViewModel,
+    onClose: () -> Unit
+) {
+    val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { items.size })
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shadowElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver a la lista")
+                }
+                Text(
+                    text = "Turno ${pagerState.currentPage + 1}/${items.size}",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                )
+                Spacer(modifier = Modifier.width(48.dp))
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val item = items[page]
+            if (item.appointment != null) {
+                OccupiedTurnDetail(
+                    appointment = item.appointment,
+                    serviceName = services.find { it.id == item.appointment.serviceId }?.name ?: "Servicio de Barbería",
+                    viewModel = viewModel
+                )
+            } else {
+                FreeTurnDetail(
+                    label = TodaySlotBuilder.nextAppointmentLabel(items, item.time),
+                    isCanceled = item.canceledAppointment != null
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OccupiedTurnDetail(
+    appointment: Appointment,
+    serviceName: String,
+    viewModel: AdminViewModel
+) {
+    val context = LocalContext.current
+    val elapsedMap by viewModel.elapsedByAppointment.collectAsState()
+    val elapsed = elapsedMap[appointment.id] ?: 0L
+    var notes by remember(appointment.id) { mutableStateOf(appointment.notes ?: "") }
+    var isFinalized by remember(appointment.id) { mutableStateOf(appointment.status == "attended") }
+    var isTimerRunning by remember(appointment.id) { mutableStateOf(viewModel.isCardTimerRunning(appointment.id)) }
+
+    val clientDisplayName = buildString {
+        append(appointment.fullName)
+        if (!appointment.lastName1.isNullOrBlank()) append(" ${appointment.lastName1}")
+        if (!appointment.lastName2.isNullOrBlank()) append(" ${appointment.lastName2}")
+    }.trim()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = "${appointment.appointmentTime.take(5)} · Ticket #${appointment.ticketNumber}",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = if (clientDisplayName.isNotEmpty()) clientDisplayName else "Cliente",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Center
+        )
+        if (appointment.phone.isNotBlank()) {
+            Text(
+                text = appointment.phone,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = serviceName,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        if (appointment.isAnnexed) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "⚠️ Reserva anexada para otra persona",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    val cleanPhone = appointment.phone.replace(" ", "").replace("+", "")
+                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone")))
+                },
+                modifier = Modifier.weight(1f),
+                enabled = appointment.phone.isNotBlank() && !isFinalized
+            ) {
+                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Llamar")
+            }
+            OutlinedButton(
+                onClick = { viewModel.cancelAppointment(appointment.id) },
+                modifier = Modifier.weight(1f),
+                enabled = !isFinalized,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Cancelar")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = notes,
+            onValueChange = {
+                notes = it
+                viewModel.updateNotesForAppointment(appointment.id, it)
+            },
+            label = { Text("Notas") },
+            placeholder = { Text("Agregar nota sobre este turno...") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            enabled = !isFinalized
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Cronómetro propio de este turno
+        val mins = elapsed / 60
+        val secs = elapsed % 60
+        val timeStr = "%02d:%02d".format(mins, secs)
+
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.AccessTime, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(timeStr, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.width(16.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (isTimerRunning) {
+                            viewModel.pauseCardTimer(appointment.id)
+                        } else {
+                            viewModel.startCardTimer(appointment.id)
+                        }
+                        isTimerRunning = !isTimerRunning
+                    },
+                    enabled = !isFinalized
+                ) {
+                    Icon(
+                        imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isTimerRunning) "Pausar" else "Iniciar cronómetro")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(
+            onClick = {
+                viewModel.finalizeAppointment(appointment.id)
+                isFinalized = true
+                isTimerRunning = false
+            },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            enabled = !isFinalized,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+        ) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "FINALIZADO",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun FreeTurnDetail(label: String, isCanceled: Boolean) {
+    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (isCanceled) "Este turno fue cancelado" else "Este turno está libre",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Diálogo del botón ⊘: elegir "Desde ahora" (todos los turnos restantes) o
+ * "Desde un turno" (turno elegido en adelante), con confirmación final antes
+ * de aplicar. Se movió aquí (vista Activo) según lo pedido.
+ */
+@Composable
+private fun BlockRestOfDayDialog(
+    timeSlots: List<String>,
+    currentTime: String,
+    onDismiss: () -> Unit,
+    onConfirm: (fromTime: String?) -> Unit
+) {
+    var selectedOption by remember { mutableStateOf("now") } // "now" | "fromSlot"
+    var selectedSlot by remember { mutableStateOf(timeSlots.firstOrNull { it > currentTime } ?: timeSlots.last()) }
+    var showConfirmStep by remember { mutableStateOf(false) }
+
+    if (!showConfirmStep) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Tomarse libre el resto del día", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+            text = {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        RadioButton(selected = selectedOption == "now", onClick = { selectedOption = "now" })
+                        Text("Desde ahora", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        RadioButton(selected = selectedOption == "fromSlot", onClick = { selectedOption = "fromSlot" })
+                        Text("Desde un turno", style = MaterialTheme.typography.bodyLarge)
+                    }
+
+                    if (selectedOption == "fromSlot") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.heightIn(max = 220.dp)) {
+                            items(timeSlots) { slot ->
+                                val index = timeSlots.indexOf(slot) + 1
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(selected = selectedSlot == slot, onClick = { selectedSlot = slot })
+                                    Text("Turno $index — $slot", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showConfirmStep = true }) {
+                    Text("Continuar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    } else {
+        val fromTime = if (selectedOption == "now") null else selectedSlot
+        val slotIndex = if (fromTime != null) timeSlots.indexOf(fromTime) + 1 else null
+        AlertDialog(
+            onDismissRequest = { showConfirmStep = false },
+            title = { Text("Confirmar", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+            text = {
+                Text(
+                    if (fromTime == null) {
+                        "¿Quieres marcar como libre el resto del día desde ahora?"
+                    } else {
+                        "¿Quieres marcar como libre el resto del día desde el turno $slotIndex — $fromTime?"
+                    }
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onConfirm(fromTime) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmStep = false }) {
+                    Text("Cancelar")
                 }
             }
         )
