@@ -38,8 +38,11 @@ fun PhotoPickerField(
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var hasNewSelection by remember { mutableStateOf(false) }
 
+    // 🔧 Launcher configurado directamente con el filtro de solo imágenes
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
+        contract = ActivityResultContracts.PickVisualMedia(
+            ActivityResultContracts.PickVisualMedia.ImageOnly
+        )
     ) { uri: Uri? ->
         if (uri != null) {
             val cropped = loadAndCropSquare(context, uri)
@@ -66,12 +69,8 @@ fun PhotoPickerField(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
                 .clickable {
-                    // 🔧 Solución correcta:
-                    launcher.launch(
-                        ActivityResultContracts.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
+                    // 🔧 Lanzamos con Unit porque el contrato ya incluye el filtro
+                    launcher.launch(Unit)
                 },
             contentAlignment = Alignment.Center
         ) {
