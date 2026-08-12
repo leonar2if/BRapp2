@@ -207,9 +207,15 @@ fun AdminCalendarScreen(
 
             if (clientStyleView) {
                 items(SlotSchedule.DEFAULT_SLOTS) { slot ->
-                    val apptForSlot = dateAppts.firstOrNull {
-                        it.appointmentTime.take(5) == slot &&
-                            it.status != "canceled"
+                    // Igual que ClientViewModel.isSlotOccupied: una cita ocupa
+                    // service.durationSlots turnos consecutivos desde su inicio, no
+                    // solo el turno en el que empieza (sección 3.3 / 12).
+                    val apptForSlot = dateAppts.firstOrNull { appt ->
+                        if (appt.status == "canceled") return@firstOrNull false
+                        val durationSlots = services.find { it.id == appt.serviceId }?.durationSlots ?: 1
+                        val range = SlotSchedule.slotRangeFor(appt.appointmentTime.take(5), durationSlots)
+                            ?: listOf(appt.appointmentTime.take(5))
+                        slot in range
                     }
 
                     TimeSlotWidget(

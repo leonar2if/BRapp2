@@ -29,7 +29,8 @@ fun CustomTopBar(
     onBackClick: (() -> Unit)? = null,
     onThemeToggle: (() -> Unit)? = null,
     isDarkMode: Boolean = false,
-    onLogoutClick: (() -> Unit)? = null
+    onLogoutClick: (() -> Unit)? = null,
+    isDataFresh: Boolean? = null // null = no mostrar el punto; true/false = mostrarlo (sección 1.3)
 ) {
     // Confirmación de logout centralizada aquí: CustomTopBar es el punto de
     // entrada del ícono de logout tanto para cliente como para administrador,
@@ -72,14 +73,27 @@ fun CustomTopBar(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Column {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (isDataFresh != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(
+                                            color = if (isDataFresh) Color(0xFF2E7D32) else Color.Gray.copy(alpha = 0.35f),
+                                            shape = androidx.compose.foundation.shape.CircleShape
+                                        )
+                                )
+                            }
+                        }
                         if (subtitle != null) {
                             Text(
                                 text = subtitle,

@@ -8,15 +8,20 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.CustomTopBar
+import com.example.ui.components.RefreshToast
+import com.example.ui.components.rememberRefreshFeedbackState
 import com.example.ui.viewmodels.AdminViewModel
 import com.example.ui.viewmodels.AuthViewModel
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminHomeScreen(
     adminViewModel: AdminViewModel,
@@ -27,6 +32,10 @@ fun AdminHomeScreen(
     var isManagingTurns by remember { mutableStateOf(false) }
 
     val isDarkMode by authViewModel.isDarkMode.collectAsState()
+
+    val refreshFeedback = rememberRefreshFeedbackState()
+    var isPullRefreshing by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     if (isManagingTurns) {
         AdminTurnScreen(
@@ -43,7 +52,8 @@ fun AdminHomeScreen(
                 subtitle = "Rodríguez Barbería",
                 onThemeToggle = { authViewModel.setDarkMode(!isDarkMode) },
                 isDarkMode = isDarkMode,
-                onLogoutClick = { onLogout() }
+                onLogoutClick = { onLogout() },
+                isDataFresh = refreshFeedback.isFresh
             )
         },
         bottomBar = {
@@ -89,6 +99,18 @@ fun AdminHomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            PullToRefreshBox(
+                isRefreshing = isPullRefreshing,
+                onRefresh = {
+                    coroutineScope.launch {
+                        isPullRefreshing = true
+                        adminViewModel.refreshDataAwait()
+                        isPullRefreshing = false
+                        refreshFeedback.notifyRefreshed()
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
             when (currentTab) {
                 0 -> {
                     // Pestaña "HOY": operación del día actual (antes llamada "Agenda").
@@ -119,6 +141,8 @@ fun AdminHomeScreen(
                     )
                 }
             }
+            }
+            RefreshToast(refreshFeedback.toastMessage)
         }
     }
 }

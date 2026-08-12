@@ -1,6 +1,7 @@
 package com.example.ui.admin
 
 import com.example.data.models.Appointment
+import com.example.data.models.Service
 import com.example.utils.DateFormatter
 import com.example.utils.SlotSchedule
 
@@ -18,7 +19,8 @@ data class TodaySlotItem(
     val tag: TagKind,
     val icon: IconKind,
     val isCurrent: Boolean, // borde amarillo
-    val showCheckButton: Boolean
+    val showCheckButton: Boolean,
+    val isContinuation: Boolean = false // true = este turno lo ocupa una cita de varios turnos que empezó antes (sección 3.3)
 )
 
 enum class TagKind { LIBRE, OCUPADO, ACTUAL, PASADO, CANCELADO }
@@ -31,18 +33,51 @@ object TodaySlotBuilder {
      * "Actual" = el último slot cuya hora ya llegó (hora <= ahora). Si aún
      * no llega ningún slot (antes de que abra), no hay actual.
      */
-    fun build(appointments: List<Appointment>, nowTime: String = DateFormatter.getNowTimeString()): List<TodaySlotItem> {
+    fun build(
+        appointments: List<Appointment>,
+        nowTime: String = DateFormatter.getNowTimeString(),
+        services: List<Service> = emptyList()
+    ): List<TodaySlotItem> {
         val slots = SlotSchedule.DEFAULT_SLOTS
         val currentSlot = slots.lastOrNull { it <= nowTime }
 
+        // Para cada cita activa, calcula TODOS los turnos que ocupa según la
+        // duración de su servicio (sección 3.3 / 12): no solo el turno de inicio.
+        // slotOwner: turno -> (cita, esEsteElTurnoDeInicio)
+        val slotOwner = mutableMapOf<String, Pair<Appointment, Boolean>>()
+        appointments.filter { it.status != "canceled" }.forEach { appt ->
+            val durationSlots = services.find { it.id == appt.serviceId }?.durationSlots ?: 1
+            val range = SlotSchedule.slotRangeFor(appt.appointmentTime.take(5), durationSlots, slots)
+                ?: listOf(appt.appointmentTime.take(5))
+            range.forEachIndexed { index, s ->
+                // Si dos citas se pisaran (no debería pasar, pero por seguridad no
+                // pisamos un turno de inicio ya asignado con una continuación de otra).
+                if (s !in slotOwner || index == 0) {
+                    slotOwner[s] = appt to (index == 0)
+                }
+            }
+        }
+
         return slots.map { slot ->
-            val apptsHere = appointments.filter { it.appointmentTime.take(5) == slot }
-            val active = apptsHere.firstOrNull { it.status != "canceled" }
-            val canceled = apptsHere.firstOrNull { it.status == "canceled" }
+            val (active, isStart) = slotOwner[slot]?.let { it.first to it.second } ?: (null to true)
+            val canceled = if (active == null) appointments.firstOrNull {
+                it.status == "canceled" && it.appointmentTime.take(5) == slot
+            } else null
             val isCurrent = slot == currentSlot
             val isPast = currentSlot != null && slot < currentSlot
+            val isContinuation = active != null && !isStart
 
             when {
+                isContinuation -> TodaySlotItem( // turno cubierto por una cita de varios turnos que empezó antes
+                    time = slot,
+                    appointment = active,
+                    canceledAppointment = null,
+                    tag = if (isCurrent) TagKind.ACTUAL else TagKind.OCUPADO,
+                    icon = IconKind.NONE,
+                    isCurrent = isCurrent,
+                    showCheckButton = false,
+                    isContinuation = true
+                )
                 active != null && active.status == "attended" -> TodaySlotItem(
                     time = slot,
                     appointment = active,

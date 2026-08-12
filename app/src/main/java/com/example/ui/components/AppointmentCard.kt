@@ -189,9 +189,7 @@ fun AppointmentCard(
                                     modifier = Modifier.minimumInteractiveComponentSize(),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = "Atendido", modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Atendido")
+                                    Icon(Icons.Default.Check, contentDescription = "Marcar como atendido", modifier = Modifier.size(16.dp))
                                 }
                             }
                         }

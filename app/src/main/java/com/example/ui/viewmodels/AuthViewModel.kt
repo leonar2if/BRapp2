@@ -111,6 +111,19 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Cambia la contraseña real (sección 3.1). [onResult] recibe null si fue
+     * exitoso, o un mensaje de error humano si falló. Usado por el diálogo del
+     * cliente y por el del admin - una sola implementación, sin duplicar lógica.
+     */
+    fun changePassword(newPassword: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val res = authRepo.changePassword(newPassword)
+            val message = if (res.isSuccess) null else ErrorTranslator.toHumanMessage(res.exceptionOrNull())
+            onResult(message)
+        }
+    }
+
     fun logout() {
         viewModelScope.launch {
             authRepo.logout()

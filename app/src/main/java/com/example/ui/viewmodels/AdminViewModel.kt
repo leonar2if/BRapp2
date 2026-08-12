@@ -93,37 +93,42 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshData() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            val today = DateFormatter.getTodayDateString()
-            val todayList = apptRepo.fetchAppointmentsByDate(today)
-            _todayAppointments.value = todayList.sortedBy { it.appointmentTime }
-            _todayBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(today)
+        viewModelScope.launch { doRefresh() }
+    }
 
-            if (_selectedDate.value == today) {
-                _selectedDateAppointments.value = _todayAppointments.value
-                _selectedDateBlockedSlots.value = _todayBlockedSlots.value
-            } else {
-                _selectedDateAppointments.value = apptRepo.fetchAppointmentsByDate(_selectedDate.value)
-                _selectedDateBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(_selectedDate.value)
-            }
+    /** Igual que refreshData() pero awaitable, para pull-to-refresh (sección 1.1). */
+    suspend fun refreshDataAwait() = doRefresh()
 
-            val hist = apptRepo.fetchAllAppointments()
-            _allAppointments.value = hist.sortedByDescending { it.appointmentDate }
+    private suspend fun doRefresh() {
+        _isLoading.value = true
+        val today = DateFormatter.getTodayDateString()
+        val todayList = apptRepo.fetchAppointmentsByDate(today)
+        _todayAppointments.value = todayList.sortedBy { it.appointmentTime }
+        _todayBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(today)
 
-            productRepo.refreshServices()
-            productRepo.refreshProducts()
-            settingsRepo.refreshSettings()
-
-            _managerPhone.value = settingsRepo.getSettingValue("manager_phone", "34600000000")
-            _managerName.value = settingsRepo.getSettingValue("manager_name", "Gestor Rodríguez")
-            _storeHours.value = settingsRepo.getSettingValue("store_hours", "Lunes a Viernes 10:00 - 18:00")
-            _workingDaysCsv.value = normalizeWorkingDaysValue(
-                settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
-            )
-            
-            _isLoading.value = false
+        if (_selectedDate.value == today) {
+            _selectedDateAppointments.value = _todayAppointments.value
+            _selectedDateBlockedSlots.value = _todayBlockedSlots.value
+        } else {
+            _selectedDateAppointments.value = apptRepo.fetchAppointmentsByDate(_selectedDate.value)
+            _selectedDateBlockedSlots.value = blockedSlotService.getBlockedSlotsByDate(_selectedDate.value)
         }
+
+        val hist = apptRepo.fetchAllAppointments()
+        _allAppointments.value = hist.sortedByDescending { it.appointmentDate }
+
+        productRepo.refreshServices()
+        productRepo.refreshProducts()
+        settingsRepo.refreshSettings()
+
+        _managerPhone.value = settingsRepo.getSettingValue("manager_phone", "34600000000")
+        _managerName.value = settingsRepo.getSettingValue("manager_name", "Gestor Rodríguez")
+        _storeHours.value = settingsRepo.getSettingValue("store_hours", "Lunes a Viernes 10:00 - 18:00")
+        _workingDaysCsv.value = normalizeWorkingDaysValue(
+            settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
+        )
+        
+        _isLoading.value = false
     }
 
     fun selectDate(date: String) {

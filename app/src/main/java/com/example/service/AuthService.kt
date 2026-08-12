@@ -186,4 +186,25 @@ class AuthService {
             Result.failure(Exception("Error actualizando teléfono: ${getErrorMessage(e)}"))
         }
     }
+
+    /**
+     * Cambia la contraseña del usuario autenticado actual (sección 3.1). Usa el
+     * endpoint estándar de GoTrue PUT /auth/v1/user con el token de sesión actual
+     * (SupabaseClient.currentAuthToken, ya agregado por el interceptor). Si no hay
+     * sesión activa (token nulo), falla explícitamente en vez de simular éxito.
+     */
+    suspend fun changePassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
+        if (SupabaseClient.currentAuthToken.isNullOrBlank()) {
+            return@withContext Result.failure(Exception("No hay una sesión activa. Vuelve a iniciar sesión."))
+        }
+        if (newPassword.length < 6) {
+            return@withContext Result.failure(Exception("La contraseña debe tener al menos 6 caracteres."))
+        }
+        try {
+            api.updateAuthUser(mapOf("password" to newPassword))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception("Error cambiando contraseña: ${getErrorMessage(e)}"))
+        }
+    }
 }

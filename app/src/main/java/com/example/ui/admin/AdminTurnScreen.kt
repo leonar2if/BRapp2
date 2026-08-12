@@ -65,7 +65,7 @@ fun AdminTurnScreen(
         }
     }
 
-    val items = remember(todayAppts, nowTick) { TodaySlotBuilder.build(todayAppts, nowTick) }
+    val items = remember(todayAppts, nowTick, services) { TodaySlotBuilder.build(todayAppts, nowTick, services) }
 
     if (galleryStartIndex != null) {
         TodayGallery(
@@ -209,7 +209,7 @@ private fun TodaySlotRow(
 ) {
     val (tagText, tagColor) = when (item.tag) {
         TagKind.LIBRE -> "LIBRE" to Color(0xFF2E7D32)
-        TagKind.OCUPADO -> "OCUPADO" to Color(0xFFC62828)
+        TagKind.OCUPADO -> if (item.isContinuation) "OCUPADO (cont.)" to Color(0xFFC62828) else "OCUPADO" to Color(0xFFC62828)
         TagKind.ACTUAL -> "ACTUAL" to Color(0xFFF9A825)
         TagKind.PASADO -> "PASADO" to Color.Gray
         TagKind.CANCELADO -> "CANCELADO" to Color.Gray

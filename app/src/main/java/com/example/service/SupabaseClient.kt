@@ -30,6 +30,11 @@ interface SupabaseApi {
     @POST("auth/v1/token?grant_type=refresh_token")
     suspend fun refreshToken(@Body body: Map<String, String>): AuthResponse
 
+    // Actualiza datos del usuario autenticado actual (ej. password). Requiere el
+    // Authorization Bearer del propio usuario, que el authInterceptor ya agrega.
+    @PUT("auth/v1/user")
+    suspend fun updateAuthUser(@Body body: Map<String, String>): AuthUser
+
     // Profiles
     @GET("rest/v1/profiles")
     suspend fun getProfileById(@Query("id") id: String): List<Profile>

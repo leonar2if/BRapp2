@@ -39,6 +39,9 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     private val _dayAppointments = MutableStateFlow<List<Appointment>>(emptyList())
     val dayAppointments: StateFlow<List<Appointment>> = _dayAppointments
 
+    private val _isDaySlotsLoading = MutableStateFlow(false)
+    val isDaySlotsLoading: StateFlow<Boolean> = _isDaySlotsLoading
+
     private val _selectedDate = MutableStateFlow(DateFormatter.getTodayDateString())
     val selectedDate: StateFlow<String> = _selectedDate
 
@@ -75,28 +78,33 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun refreshData() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            val userId = authRepo.userId.first()
-            if (userId.isNotEmpty()) {
-                val appts = apptRepo.fetchClientAppointments(userId)
-                _clientAppointments.value = appts
-            }
-            productRepo.refreshServices()
-            productRepo.refreshProducts()
-            settingsRepo.refreshSettings()
-            
-            val phone = settingsRepo.getSettingValue("manager_phone", "34600000000")
-            _managerPhone.value = phone
-            val hours = settingsRepo.getSettingValue("store_hours", "10:00 - 18:00")
-            _storeHours.value = hours
-            _workingDays.value = SlotSchedule.parseWorkingDaysCsv(
-                settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
-            )
-            
-            fetchDaySlots(_selectedDate.value)
-            _isLoading.value = false
+        viewModelScope.launch { doRefresh() }
+    }
+
+    /** Igual que refreshData() pero awaitable, para pull-to-refresh (sección 1.1). */
+    suspend fun refreshDataAwait() = doRefresh()
+
+    private suspend fun doRefresh() {
+        _isLoading.value = true
+        val userId = authRepo.userId.first()
+        if (userId.isNotEmpty()) {
+            val appts = apptRepo.fetchClientAppointments(userId)
+            _clientAppointments.value = appts
         }
+        productRepo.refreshServices()
+        productRepo.refreshProducts()
+        settingsRepo.refreshSettings()
+        
+        val phone = settingsRepo.getSettingValue("manager_phone", "34600000000")
+        _managerPhone.value = phone
+        val hours = settingsRepo.getSettingValue("store_hours", "10:00 - 18:00")
+        _storeHours.value = hours
+        _workingDays.value = SlotSchedule.parseWorkingDaysCsv(
+            settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
+        )
+        
+        fetchDaySlots(_selectedDate.value)
+        _isLoading.value = false
     }
 
     fun selectDate(date: String) {
@@ -107,8 +115,10 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun fetchDaySlots(date: String) {
         viewModelScope.launch {
+            _isDaySlotsLoading.value = true
             val appts = apptRepo.fetchAppointmentsByDate(date)
             _dayAppointments.value = appts
+            _isDaySlotsLoading.value = false
         }
     }
 

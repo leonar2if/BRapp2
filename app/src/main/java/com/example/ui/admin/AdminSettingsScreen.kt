@@ -164,6 +164,107 @@ fun AdminSettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Cambiar contraseña (sección 3.1 - antes no existía en el admin)
+        item {
+            var showChangePasswordDialog by remember { mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showChangePasswordDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Cambiar Contraseña", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+
+            if (showChangePasswordDialog) {
+                var newPass by remember { mutableStateOf("") }
+                var confirmPass by remember { mutableStateOf("") }
+                var errorText by remember { mutableStateOf<String?>(null) }
+                var successText by remember { mutableStateOf<String?>(null) }
+                var isSaving by remember { mutableStateOf(false) }
+
+                AlertDialog(
+                    onDismissRequest = { if (!isSaving) showChangePasswordDialog = false },
+                    title = { Text("Cambiar Contraseña", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+                    text = {
+                        Column {
+                            if (successText != null) {
+                                Text(successText!!, color = Color(0xFF2E7D32))
+                            } else {
+                                Text("Introduce tu nueva contraseña:")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = newPass,
+                                    onValueChange = { newPass = it; errorText = null },
+                                    label = { Text("Nueva contraseña") },
+                                    singleLine = true,
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = confirmPass,
+                                    onValueChange = { confirmPass = it; errorText = null },
+                                    label = { Text("Confirmar contraseña") },
+                                    singleLine = true,
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                                )
+                                if (errorText != null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(errorText!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        if (successText != null) {
+                            Button(onClick = { showChangePasswordDialog = false }) { Text("Listo") }
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (newPass != confirmPass) {
+                                        errorText = "Las contraseñas no coinciden."
+                                        return@Button
+                                    }
+                                    isSaving = true
+                                    authViewModel.changePassword(newPass) { error ->
+                                        isSaving = false
+                                        if (error == null) {
+                                            successText = "Contraseña actualizada correctamente."
+                                        } else {
+                                            errorText = error
+                                        }
+                                    }
+                                },
+                                enabled = !isSaving && newPass.length >= 6 && confirmPass.length >= 6
+                            ) {
+                                Text(if (isSaving) "Guardando..." else "Guardar")
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        if (successText == null) {
+                            TextButton(onClick = { showChangePasswordDialog = false }, enabled = !isSaving) {
+                                Text("Cancelar")
+                            }
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // Horarios de apertura
         item {
             Card(

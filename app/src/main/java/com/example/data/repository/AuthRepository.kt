@@ -84,6 +84,10 @@ class AuthRepository(context: Context) {
         return res
     }
 
+    suspend fun changePassword(newPassword: String): Result<Unit> {
+        return authService.changePassword(newPassword)
+    }
+
     suspend fun setDarkMode(enabled: Boolean) {
         prefs.setDarkMode(enabled)
     }

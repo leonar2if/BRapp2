@@ -38,7 +38,8 @@ import com.example.utils.Validators
 @Composable
 fun BookAppointmentScreen(
     viewModel: ClientViewModel,
-    onNavigateBackToHome: () -> Unit
+    onNavigateBackToHome: () -> Unit,
+    onDaySlotsRefreshed: () -> Unit = {}
 ) {
     val step by viewModel.bookingStep.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
@@ -53,8 +54,12 @@ fun BookAppointmentScreen(
     val timeSlots = remember { SlotSchedule.DEFAULT_SLOTS }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Top header bar depending on step
-        if (step > 0 && step < 4) {
+        // Top header bar depending on step. Se omite en el paso 1 (selección de
+        // fecha/hora): antes quedaba una barra fija "Seleccionar Hora (fecha)"
+        // ocupando espacio permanentemente - el calendario y los turnos ya se ven
+        // sin necesidad de esa barra, y la navegación hacia atrás la sigue dando
+        // el CustomTopBar general de la pantalla (sección 2.1).
+        if (step in 2..3) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 shadowElevation = 2.dp
@@ -135,25 +140,44 @@ fun BookAppointmentScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        val slotsChunked = timeSlots.chunked(2)
-                        items(slotsChunked) { rowSlots ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowSlots.forEach { slot ->
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        val isOccupied = viewModel.isSlotOccupied(slot)
-                                        TimeSlotWidget(
-                                            time = slot,
-                                            isOccupied = isOccupied,
-                                            isSelected = selectedTime == slot,
-                                            onClick = { viewModel.selectTime(slot) }
-                                        )
-                                    }
+                        val isDaySlotsLoading by viewModel.isDaySlotsLoading.collectAsState()
+                        var wasDaySlotsLoading by remember { mutableStateOf(false) }
+                        LaunchedEffect(isDaySlotsLoading) {
+                            if (wasDaySlotsLoading && !isDaySlotsLoading) onDaySlotsRefreshed()
+                            wasDaySlotsLoading = isDaySlotsLoading
+                        }
+                        if (isDaySlotsLoading) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
                                 }
-                                if (rowSlots.size == 1) {
-                                    Spacer(modifier = Modifier.weight(1f))
+                            }
+                        } else {
+                            val slotsChunked = timeSlots.chunked(2)
+                            items(slotsChunked) { rowSlots ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowSlots.forEach { slot ->
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            val isOccupied = viewModel.isSlotOccupied(slot)
+                                            TimeSlotWidget(
+                                                time = slot,
+                                                isOccupied = isOccupied,
+                                                isSelected = selectedTime == slot,
+                                                onClick = { viewModel.selectTime(slot) }
+                                            )
+                                        }
+                                    }
+                                    if (rowSlots.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }

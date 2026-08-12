@@ -7,15 +7,22 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.data.models.Product
 import com.example.ui.components.CustomTopBar
+import com.example.ui.components.RefreshToast
+import com.example.ui.components.rememberRefreshFeedbackState
 import com.example.ui.viewmodels.AuthViewModel
 import com.example.ui.viewmodels.ClientViewModel
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientHomeScreen(
     clientViewModel: ClientViewModel,
@@ -30,6 +37,13 @@ fun ClientHomeScreen(
     val isDarkMode by authViewModel.isDarkMode.collectAsState()
     val products by clientViewModel.activeProducts.collectAsState()
     val managerPhone by clientViewModel.managerPhone.collectAsState()
+
+    // Pull-to-refresh + toast + punto de frescura (sección 1). Un solo estado
+    // compartido para todo esto, disparado tanto por el gesto de swipe como por
+    // cambios de día dentro de la reserva (sección 2.4).
+    val refreshFeedback = rememberRefreshFeedbackState()
+    var isPullRefreshing by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val productForDetail = selectedProductForDetail
     if (productForDetail != null) {
@@ -48,7 +62,8 @@ fun ClientHomeScreen(
                 subtitle = "Barbería & Estilo",
                 onThemeToggle = { authViewModel.setDarkMode(!isDarkMode) },
                 isDarkMode = isDarkMode,
-                onLogoutClick = { onLogout() }
+                onLogoutClick = { onLogout() },
+                isDataFresh = refreshFeedback.isFresh
             )
         },
         bottomBar = {
@@ -82,11 +97,24 @@ fun ClientHomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            PullToRefreshBox(
+                isRefreshing = isPullRefreshing,
+                onRefresh = {
+                    coroutineScope.launch {
+                        isPullRefreshing = true
+                        clientViewModel.refreshDataAwait()
+                        isPullRefreshing = false
+                        refreshFeedback.notifyRefreshed()
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
             when (currentTab) {
                 0 -> {
                     BookAppointmentScreen(
                         viewModel = clientViewModel,
-                        onNavigateBackToHome = { currentTab = 0 }
+                        onNavigateBackToHome = { currentTab = 0 },
+                        onDaySlotsRefreshed = { refreshFeedback.notifyRefreshed() }
                     )
                 }
                 1 -> {
@@ -116,40 +144,81 @@ fun ClientHomeScreen(
                     )
                 }
             }
+            }
+            RefreshToast(refreshFeedback.toastMessage)
         }
     }
 
     if (showChangePasswordDialog) {
         var newPass by remember { mutableStateOf("") }
+        var confirmPass by remember { mutableStateOf("") }
+        var errorText by remember { mutableStateOf<String?>(null) }
+        var successText by remember { mutableStateOf<String?>(null) }
+        var isSaving by remember { mutableStateOf(false) }
+
         AlertDialog(
-            onDismissRequest = { showChangePasswordDialog = false },
+            onDismissRequest = { if (!isSaving) showChangePasswordDialog = false },
             title = { Text("Cambiar Contraseña", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
             text = {
                 Column {
-                    Text("Introduce tu nueva contraseña:")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newPass,
-                        onValueChange = { newPass = it },
-                        label = { Text("Nueva contraseña") },
-                        singleLine = true
-                    )
+                    if (successText != null) {
+                        Text(successText!!, color = Color(0xFF2E7D32))
+                    } else {
+                        Text("Introduce tu nueva contraseña:")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newPass,
+                            onValueChange = { newPass = it; errorText = null },
+                            label = { Text("Nueva contraseña") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = confirmPass,
+                            onValueChange = { confirmPass = it; errorText = null },
+                            label = { Text("Confirmar contraseña") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                        if (errorText != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(errorText!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        // In demo/basic mode, close dialog
-                        showChangePasswordDialog = false
-                    },
-                    enabled = newPass.length >= 6
-                ) {
-                    Text("Guardar")
+                if (successText != null) {
+                    Button(onClick = { showChangePasswordDialog = false }) { Text("Listo") }
+                } else {
+                    Button(
+                        onClick = {
+                            if (newPass != confirmPass) {
+                                errorText = "Las contraseñas no coinciden."
+                                return@Button
+                            }
+                            isSaving = true
+                            authViewModel.changePassword(newPass) { error ->
+                                isSaving = false
+                                if (error == null) {
+                                    successText = "Contraseña actualizada correctamente."
+                                } else {
+                                    errorText = error
+                                }
+                            }
+                        },
+                        enabled = !isSaving && newPass.length >= 6 && confirmPass.length >= 6
+                    ) {
+                        Text(if (isSaving) "Guardando..." else "Guardar")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showChangePasswordDialog = false }) {
-                    Text("Cancelar")
+                if (successText == null) {
+                    TextButton(onClick = { showChangePasswordDialog = false }, enabled = !isSaving) {
+                        Text("Cancelar")
+                    }
                 }
             }
         )
