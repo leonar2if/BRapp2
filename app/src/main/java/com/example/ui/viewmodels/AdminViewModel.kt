@@ -25,12 +25,38 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = Room.databaseBuilder(application, AppDatabase::class.java, "barberia_cache").build()
+    private val db = Room.databaseBuilder(application, AppDatabase::class.java, "barberia_cache").fallbackToDestructiveMigration().build()
     private val productRepo = ProductRepository(db.serviceDao(), db.productDao())
     private val apptRepo = AppointmentRepository()
     private val settingsRepo = SettingsRepository(db.settingsDao())
     private val authRepo = AuthRepository(application)
     private val blockedSlotService = BlockedSlotService()
+    private val clientNoteRepo = com.example.data.repository.ClientNoteRepository(db.clientNoteDao())
+
+    fun getNotesForClient(phone: String): Flow<List<com.example.data.models.ClientNoteEntity>> =
+        clientNoteRepo.getNotesForClient(phone)
+
+    fun addClientNote(clientPhone: String, clientName: String, text: String) {
+        viewModelScope.launch {
+            clientNoteRepo.addNote(clientPhone, clientName, text)
+        }
+    }
+
+    /**
+     * Sube las notas pendientes antes de cerrar sesión (sección 6). Best-effort:
+     * si no hay conexión, las notas quedan intactas localmente para la próxima
+     * vez - el logout continúa de todos modos, no se bloquea esperando la red.
+     */
+    suspend fun uploadPendingNotesBeforeLogout() {
+        val adminId = authRepo.userId.first()
+        if (adminId.isNotEmpty()) {
+            try {
+                clientNoteRepo.uploadPendingNotes(adminId)
+            } catch (e: Exception) {
+                // best-effort, no bloquea el logout
+            }
+        }
+    }
 
     val allServices: StateFlow<List<Service>> = productRepo.allServices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

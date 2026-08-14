@@ -72,13 +72,29 @@ interface SettingsDao {
     suspend fun deleteAll()
 }
 
+@Dao
+interface ClientNoteDao {
+    @Query("SELECT * FROM client_notes_local WHERE client_phone = :phone ORDER BY created_at DESC")
+    fun getNotesForClient(phone: String): Flow<List<com.example.data.models.ClientNoteEntity>>
+
+    @Insert
+    suspend fun insert(note: com.example.data.models.ClientNoteEntity)
+
+    @Query("SELECT * FROM client_notes_local WHERE synced = 0")
+    suspend fun getUnsynced(): List<com.example.data.models.ClientNoteEntity>
+
+    @Query("UPDATE client_notes_local SET synced = 1 WHERE id IN (:ids)")
+    suspend fun markSynced(ids: List<Long>)
+}
+
 @Database(
-    entities = [Service::class, Product::class, Settings::class],
-    version = 1,
+    entities = [Service::class, Product::class, Settings::class, com.example.data.models.ClientNoteEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serviceDao(): ServiceDao
     abstract fun productDao(): ProductDao
     abstract fun settingsDao(): SettingsDao
+    abstract fun clientNoteDao(): ClientNoteDao
 }

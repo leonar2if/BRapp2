@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 class ClientViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = Room.databaseBuilder(application, AppDatabase::class.java, "barberia_cache").build()
+    private val db = Room.databaseBuilder(application, AppDatabase::class.java, "barberia_cache").fallbackToDestructiveMigration().build()
     private val productRepo = ProductRepository(db.serviceDao(), db.productDao())
     private val apptRepo = AppointmentRepository()
     private val settingsRepo = SettingsRepository(db.settingsDao())

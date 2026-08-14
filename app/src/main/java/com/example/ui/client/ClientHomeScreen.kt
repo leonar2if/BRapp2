@@ -44,9 +44,11 @@ fun ClientHomeScreen(
     val refreshFeedback = rememberRefreshFeedbackState()
     var isPullRefreshing by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val productForDetail = selectedProductForDetail
     if (productForDetail != null) {
+        androidx.activity.compose.BackHandler { selectedProductForDetail = null }
         ProductDetailScreen(
             product = productForDetail,
             managerPhone = managerPhone,
@@ -102,9 +104,14 @@ fun ClientHomeScreen(
                 onRefresh = {
                     coroutineScope.launch {
                         isPullRefreshing = true
-                        clientViewModel.refreshDataAwait()
-                        isPullRefreshing = false
-                        refreshFeedback.notifyRefreshed()
+                        if (com.example.utils.NetworkUtils.isOnline(context)) {
+                            clientViewModel.refreshDataAwait()
+                            isPullRefreshing = false
+                            refreshFeedback.notifyRefreshed()
+                        } else {
+                            isPullRefreshing = false
+                            refreshFeedback.notifyRefreshFailed()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -145,7 +152,7 @@ fun ClientHomeScreen(
                 }
             }
             }
-            RefreshToast(refreshFeedback.toastMessage)
+            RefreshToast(refreshFeedback.toastMessage, isError = refreshFeedback.isError)
         }
     }
 

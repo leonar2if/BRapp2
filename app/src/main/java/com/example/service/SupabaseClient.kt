@@ -115,6 +115,11 @@ interface SupabaseApi {
     @PATCH("rest/v1/settings")
     suspend fun updateSettingByKey(@Query("key") key: String, @Body updates: Map<String, Any?>): List<Settings>
 
+    // Client notes (secciones 4/5/6). Body simple con Map, sin reutilizar la
+    // entidad Room (así no arrastramos el id local ni el flag "synced" al POST).
+    @POST("rest/v1/client_notes")
+    suspend fun createClientNote(@Body body: Map<String, String>)
+
     // RPCs
     @POST("rest/v1/rpc/get_next_ticket")
     suspend fun getNextTicket(@Body body: Map<String, String>): Int?

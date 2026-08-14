@@ -74,7 +74,7 @@ class BootReceiver : BroadcastReceiver() {
             appointmentRepository.fetchClientAppointments(userId)
         }
 
-        val db = Room.databaseBuilder(context, AppDatabase::class.java, "barberia_cache").build()
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, "barberia_cache").fallbackToDestructiveMigration().build()
         val serviceNamesById = try {
             db.serviceDao().getAllServices().first().associateBy({ it.id }, { it.name })
         } catch (e: Exception) {

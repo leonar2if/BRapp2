@@ -13,10 +13,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
@@ -68,6 +71,7 @@ fun AdminTurnScreen(
     val items = remember(todayAppts, nowTick, services) { TodaySlotBuilder.build(todayAppts, nowTick, services) }
 
     if (galleryStartIndex != null) {
+        androidx.activity.compose.BackHandler { galleryStartIndex = null }
         TodayGallery(
             items = items,
             startIndex = galleryStartIndex!!,
@@ -481,6 +485,16 @@ private fun OccupiedTurnDetail(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // Notas del cliente que se ACUMULAN entre visitas (secciones 4/5/6),
+        // distintas de la nota de arriba que es solo de este turno puntual.
+        ClientNotesSection(
+            clientPhone = appointment.phone,
+            clientName = clientDisplayName,
+            viewModel = viewModel
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         // Cronómetro propio de este turno
         val mins = elapsed / 60
         val secs = elapsed % 60
@@ -668,5 +682,90 @@ private fun BlockRestOfDayDialog(
                 }
             }
         )
+    }
+}
+
+/**
+ * Notas simples y acumulables del cliente (secciones 4/5). Cada nota nueva se
+ * agrega a la lista, ninguna reemplaza a las anteriores. Se guardan en Room de
+ * inmediato (ClientNoteRepository) y se suben a Supabase recién al cerrar
+ * sesión (AdminViewModel.uploadPendingNotesBeforeLogout).
+ */
+@Composable
+private fun ClientNotesSection(
+    clientPhone: String,
+    clientName: String,
+    viewModel: AdminViewModel
+) {
+    if (clientPhone.isBlank()) return
+
+    val notes by viewModel.getNotesForClient(clientPhone).collectAsState(initial = emptyList())
+    var newNoteText by remember(clientPhone) { mutableStateOf("") }
+    val noteDateFormat = remember { java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale("es", "ES")) }
+
+    Column {
+        Text(
+            text = "Notas del cliente" + if (notes.isNotEmpty()) " (${notes.size})" else "",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (notes.isEmpty()) {
+            Text(
+                text = "Sin notas todavía.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 180.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                notes.forEach { n ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(n.note, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = noteDateFormat.format(java.util.Date(n.createdAt)) + if (!n.synced) " · pendiente de subir" else "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = newNoteText,
+                onValueChange = { newNoteText = it },
+                placeholder = { Text("Nueva nota sobre este cliente...") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = {
+                    if (newNoteText.isNotBlank()) {
+                        viewModel.addClientNote(clientPhone, clientName, newNoteText)
+                        newNoteText = ""
+                    }
+                },
+                enabled = newNoteText.isNotBlank()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Agregar nota")
+            }
+        }
     }
 }

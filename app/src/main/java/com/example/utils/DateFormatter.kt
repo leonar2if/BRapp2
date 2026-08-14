@@ -12,14 +12,15 @@ object DateFormatter {
     private val displayDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     private val displayMonthYear = SimpleDateFormat("MMMM yyyy", Locale("es", "ES"))
     private val displayDayName = SimpleDateFormat("EEEE d 'de' MMMM", Locale("es", "ES"))
-    private val time12hFormat = SimpleDateFormat("h:mm a", Locale("es", "ES"))
+    private val time12hFormat = SimpleDateFormat("h:mm", Locale("es", "ES"))
 
-    /** "13:00" -> "1:00 PM", "09:30" -> "9:30 AM". Solo para mostrar; la lógica de
-     * turnos sigue comparando el string original "HH:mm" en todas partes. */
+    /** "13:00" -> "1:00", "09:30" -> "9:30". Formato 12h SIN indicador AM/PM (para
+     * que quepa en tarjetas/botones chicos). La lógica de turnos sigue comparando
+     * el string original "HH:mm" en todas partes, esto es solo visual. */
     fun formatTimeForDisplay(time: String): String {
         return try {
             val parsed = timeFormat.parse(time.take(5)) ?: return time
-            time12hFormat.format(parsed).uppercase(Locale("es", "ES"))
+            time12hFormat.format(parsed)
         } catch (e: Exception) {
             time
         }

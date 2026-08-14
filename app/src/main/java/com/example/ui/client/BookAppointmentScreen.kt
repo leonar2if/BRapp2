@@ -42,6 +42,9 @@ fun BookAppointmentScreen(
     onDaySlotsRefreshed: () -> Unit = {}
 ) {
     val step by viewModel.bookingStep.collectAsState()
+    androidx.activity.compose.BackHandler(enabled = step in 1..4) {
+        if (step == 4) viewModel.resetBookingFlow() else viewModel.setBookingStep(step - 1)
+    }
     val selectedDate by viewModel.selectedDate.collectAsState()
     val selectedTime by viewModel.selectedTime.collectAsState()
     val selectedService by viewModel.selectedService.collectAsState()

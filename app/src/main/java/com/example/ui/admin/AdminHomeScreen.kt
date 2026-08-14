@@ -1,5 +1,6 @@
 package com.example.ui.admin
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -36,8 +37,20 @@ fun AdminHomeScreen(
     val refreshFeedback = rememberRefreshFeedbackState()
     var isPullRefreshing by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Sección 6: antes de cerrar sesión, intenta subir las notas locales
+    // pendientes. Si no hay conexión, quedan guardadas para el próximo intento;
+    // el logout sigue de todos modos, no se bloquea esperando la red.
+    val handleLogout: () -> Unit = {
+        coroutineScope.launch {
+            adminViewModel.uploadPendingNotesBeforeLogout()
+            onLogout()
+        }
+    }
 
     if (isManagingTurns) {
+        BackHandler { isManagingTurns = false }
         AdminTurnScreen(
             viewModel = adminViewModel,
             onBackClick = { isManagingTurns = false }
@@ -52,7 +65,7 @@ fun AdminHomeScreen(
                 subtitle = "Rodríguez Barbería",
                 onThemeToggle = { authViewModel.setDarkMode(!isDarkMode) },
                 isDarkMode = isDarkMode,
-                onLogoutClick = { onLogout() },
+                onLogoutClick = { handleLogout() },
                 isDataFresh = refreshFeedback.isFresh
             )
         },
@@ -104,9 +117,16 @@ fun AdminHomeScreen(
                 onRefresh = {
                     coroutineScope.launch {
                         isPullRefreshing = true
-                        adminViewModel.refreshDataAwait()
-                        isPullRefreshing = false
-                        refreshFeedback.notifyRefreshed()
+                        if (com.example.utils.NetworkUtils.isOnline(context)) {
+                            adminViewModel.refreshDataAwait()
+                            isPullRefreshing = false
+                            // Punto verde 1 minuto (no 3s) según sección 3: solo
+                            // significa "la actualización realmente terminó bien".
+                            refreshFeedback.notifyRefreshed(message = "Actualizado", freshDurationMs = 60_000)
+                        } else {
+                            isPullRefreshing = false
+                            refreshFeedback.notifyRefreshFailed()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -137,12 +157,12 @@ fun AdminHomeScreen(
                     AdminSettingsScreen(
                         adminViewModel = adminViewModel,
                         authViewModel = authViewModel,
-                        onLogout = onLogout
+                        onLogout = handleLogout
                     )
                 }
             }
             }
-            RefreshToast(refreshFeedback.toastMessage)
+            RefreshToast(refreshFeedback.toastMessage, isError = refreshFeedback.isError)
         }
     }
 }

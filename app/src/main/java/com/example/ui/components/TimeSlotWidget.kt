@@ -68,7 +68,9 @@ fun TimeSlotWidget(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 ),
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false
             )
 
             Surface(
@@ -87,6 +89,8 @@ fun TimeSlotWidget(
                     },
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
