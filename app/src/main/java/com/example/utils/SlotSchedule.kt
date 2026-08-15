@@ -38,11 +38,41 @@ object SlotSchedule {
         return cal.get(Calendar.DAY_OF_WEEK) in workingDays
     }
 
+    /**
+     * Convierte el CSV guardado en settings.slot_definitions (ej. "10:00,10:30,
+     * 11:00,...") a la lista de turnos activa. Valida formato "HH:mm", elimina
+     * duplicados y ordena cronológicamente. Si viene vacío/corrupto, cae en
+     * DEFAULT_SLOTS para no dejar la app sin turnos por un dato mal guardado.
+     */
+    fun parseSlotDefinitionsCsv(csv: String): List<String> {
+        val timeRegex = Regex("^([01][0-9]|2[0-3]):[0-5][0-9]$")
+        val parsed = csv.split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() && timeRegex.matches(it) }
+            .distinct()
+            .sorted()
+        return if (parsed.isEmpty()) DEFAULT_SLOTS else parsed
+    }
+
+    fun slotDefinitionsToCsv(slots: List<String>): String = slots.sorted().joinToString(",")
+
     private val DAY_CODE_TO_CALENDAR = mapOf(
         "SUN" to Calendar.SUNDAY, "MON" to Calendar.MONDAY, "TUE" to Calendar.TUESDAY,
         "WED" to Calendar.WEDNESDAY, "THU" to Calendar.THURSDAY, "FRI" to Calendar.FRIDAY,
         "SAT" to Calendar.SATURDAY
     )
+
+    private val DAY_ORDER = listOf(Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.THURSDAY, Calendar.FRIDAY, Calendar.SATURDAY, Calendar.SUNDAY)
+    private val CALENDAR_TO_DAY_CODE = DAY_CODE_TO_CALENDAR.entries.associate { (k, v) -> v to k }
+
+    val ALL_DAY_CODES_IN_ORDER: List<String> = DAY_ORDER.mapNotNull { CALENDAR_TO_DAY_CODE[it] }
+
+    private val DAY_CODE_LABELS = mapOf(
+        "MON" to "Lunes", "TUE" to "Martes", "WED" to "Miércoles", "THU" to "Jueves",
+        "FRI" to "Viernes", "SAT" to "Sábado", "SUN" to "Domingo"
+    )
+
+    fun dayLabel(code: String): String = DAY_CODE_LABELS[code] ?: code
 
     /**
      * Convierte el CSV guardado en settings.working_days (ej. "MON,TUE,WED,
@@ -78,7 +108,7 @@ object SlotSchedule {
     }
 
     /**
-     * Índices de slot [startIndex, startIndex + durationSlots) para un
+     * Índices de slot desde startIndex hasta startIndex + durationSlots (exclusivo) para un
      * servicio que empieza en `time`. Devuelve null si `time` no es un
      * turno válido o si el servicio se saldría del día.
      * No hardcodea "2 turnos": la duración viene de Service.durationSlots.

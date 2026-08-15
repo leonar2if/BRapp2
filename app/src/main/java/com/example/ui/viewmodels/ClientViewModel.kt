@@ -73,6 +73,10 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     // Por defecto lunes a viernes hasta que se cargue el valor real de settings.
     private val _workingDays = MutableStateFlow(SlotSchedule.DEFAULT_WORKING_DAYS)
 
+    // Turnos configurables (misma fuente que el admin, sección Horario en Ajustes).
+    private val _activeSlots = MutableStateFlow(SlotSchedule.DEFAULT_SLOTS)
+    val activeSlots: StateFlow<List<String>> = _activeSlots
+
     init {
         refreshData()
     }
@@ -101,6 +105,9 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         _storeHours.value = hours
         _workingDays.value = SlotSchedule.parseWorkingDaysCsv(
             settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
+        )
+        _activeSlots.value = SlotSchedule.parseSlotDefinitionsCsv(
+            settingsRepo.getSettingValue("slot_definitions", SlotSchedule.slotDefinitionsToCsv(SlotSchedule.DEFAULT_SLOTS))
         )
         
         fetchDaySlots(_selectedDate.value)
@@ -133,7 +140,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         // libre. Un servicio de N turnos debe bloquear los N, y esto evita
         // que el cliente llegue a confirmar una cita que en realidad choca
         // con otra reserva en el segundo/tercer turno. Sección 12.
-        val range = com.example.utils.SlotSchedule.slotRangeFor(_selectedTime.value, service.durationSlots)
+        val range = com.example.utils.SlotSchedule.slotRangeFor(_selectedTime.value, service.durationSlots, _activeSlots.value)
         if (range == null) {
             _bookingError.value = "Este servicio no cabe en el horario restante del día. Elige otra hora."
             _selectedTime.value = ""
@@ -205,7 +212,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
                 createdByAdmin = false
             )
 
-            val res = apptRepo.createAppointment(appt, service.durationSlots)
+            val res = apptRepo.createAppointment(appt, service.durationSlots, _activeSlots.value)
             _isLoading.value = false
             val booked = res.getOrNull()
             if (res.isSuccess && booked != null) {
@@ -263,7 +270,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
             // reservado. Así un servicio de 2+ turnos bloquea todos los
             // turnos que ocupa, no solo el primero (sección 12).
             val durationSlots = services.find { it.id == appt.serviceId }?.durationSlots ?: 1
-            val range = com.example.utils.SlotSchedule.slotRangeFor(appt.appointmentTime.take(5), durationSlots)
+            val range = com.example.utils.SlotSchedule.slotRangeFor(appt.appointmentTime.take(5), durationSlots, _activeSlots.value)
                 ?: listOf(appt.appointmentTime.take(5))
             time.take(5) in range
         }
@@ -275,7 +282,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         if (!SlotSchedule.isWorkingDay(dateStr, _workingDays.value)) return "gray" // fin de semana / día no laborable
 
         val dayAppts = _dayAppointments.value.filter { it.appointmentDate == dateStr && it.status != "canceled" }
-        val allSlots = SlotSchedule.DEFAULT_SLOTS
+        val allSlots = _activeSlots.value
         return when {
             dayAppts.size >= allSlots.size -> "red"
             dayAppts.isEmpty() -> "green"

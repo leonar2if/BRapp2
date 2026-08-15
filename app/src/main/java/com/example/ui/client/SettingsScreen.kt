@@ -178,6 +178,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text("Cerrar Sesión", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         }
+
+        com.example.ui.components.DeveloperCreditFooter()
     }
 
     if (showLogoutConfirm) {

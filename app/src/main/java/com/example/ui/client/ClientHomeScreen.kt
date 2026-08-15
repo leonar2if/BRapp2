@@ -173,20 +173,18 @@ fun ClientHomeScreen(
                     } else {
                         Text("Introduce tu nueva contraseña:")
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
+                        com.example.ui.components.PasswordField(
                             value = newPass,
                             onValueChange = { newPass = it; errorText = null },
-                            label = { Text("Nueva contraseña") },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation()
+                            label = "Nueva contraseña",
+                            showLockIcon = false
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
+                        com.example.ui.components.PasswordField(
                             value = confirmPass,
                             onValueChange = { confirmPass = it; errorText = null },
-                            label = { Text("Confirmar contraseña") },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation()
+                            label = "Confirmar contraseña",
+                            showLockIcon = false
                         )
                         if (errorText != null) {
                             Spacer(modifier = Modifier.height(8.dp))

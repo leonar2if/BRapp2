@@ -53,6 +53,7 @@ fun AdminTurnScreen(
 ) {
     val todayAppts by viewModel.todayAppointments.collectAsState()
     val services by viewModel.allServices.collectAsState()
+    val activeSlots by viewModel.activeSlots.collectAsState()
 
     var showBlockDialog by remember { mutableStateOf(false) }
     var showEndDayDialog by remember { mutableStateOf(false) }
@@ -68,7 +69,7 @@ fun AdminTurnScreen(
         }
     }
 
-    val items = remember(todayAppts, nowTick, services) { TodaySlotBuilder.build(todayAppts, nowTick, services) }
+    val items = remember(todayAppts, nowTick, services, activeSlots) { TodaySlotBuilder.build(todayAppts, nowTick, services, activeSlots) }
 
     if (galleryStartIndex != null) {
         androidx.activity.compose.BackHandler { galleryStartIndex = null }
@@ -146,7 +147,7 @@ fun AdminTurnScreen(
     if (showBlockDialog) {
         val today = remember { DateFormatter.getTodayDateString() }
         BlockRestOfDayDialog(
-            timeSlots = com.example.utils.SlotSchedule.DEFAULT_SLOTS,
+            timeSlots = activeSlots,
             currentTime = DateFormatter.getNowTimeString(),
             onDismiss = { showBlockDialog = false },
             onConfirm = { fromTime ->
@@ -371,7 +372,6 @@ private fun OccupiedTurnDetail(
     val context = LocalContext.current
     val elapsedMap by viewModel.elapsedByAppointment.collectAsState()
     val elapsed = elapsedMap[appointment.id] ?: 0L
-    var notes by remember(appointment.id) { mutableStateOf(appointment.notes ?: "") }
     var isFinalized by remember(appointment.id) { mutableStateOf(appointment.status == "attended") }
     var isTimerRunning by remember(appointment.id) { mutableStateOf(viewModel.isCardTimerRunning(appointment.id)) }
 
@@ -470,23 +470,7 @@ private fun OccupiedTurnDetail(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = notes,
-            onValueChange = {
-                notes = it
-                viewModel.updateNotesForAppointment(appointment.id, it)
-            },
-            label = { Text("Notas") },
-            placeholder = { Text("Agregar nota sobre este turno...") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            enabled = !isFinalized
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Notas del cliente que se ACUMULAN entre visitas (secciones 4/5/6),
-        // distintas de la nota de arriba que es solo de este turno puntual.
+        // Notas del cliente: se acumulan entre visitas (secciones 4/5/6).
         ClientNotesSection(
             clientPhone = appointment.phone,
             clientName = clientDisplayName,

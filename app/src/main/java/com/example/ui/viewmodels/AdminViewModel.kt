@@ -114,6 +114,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _workingDaysCsv = MutableStateFlow("MON,TUE,WED,THU,FRI")
     val workingDaysCsv: StateFlow<String> = _workingDaysCsv
 
+    // Turnos configurables (pestaña Horario en Ajustes). Se guarda en
+    // settings.slot_definitions como CSV de horas "HH:mm". Por defecto son
+    // los 12 turnos oficiales (SlotSchedule.DEFAULT_SLOTS) hasta que el admin
+    // los edite.
+    private val _activeSlots = MutableStateFlow(SlotSchedule.DEFAULT_SLOTS)
+    val activeSlots: StateFlow<List<String>> = _activeSlots
+
+    fun saveActiveSlots(slots: List<String>) {
+        viewModelScope.launch {
+            val normalized = SlotSchedule.parseSlotDefinitionsCsv(slots.joinToString(","))
+            _activeSlots.value = normalized
+            settingsRepo.saveSetting("slot_definitions", SlotSchedule.slotDefinitionsToCsv(normalized))
+        }
+    }
+
     init {
         refreshData()
     }
@@ -153,6 +168,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _workingDaysCsv.value = normalizeWorkingDaysValue(
             settingsRepo.getSettingValue("working_days", "MON,TUE,WED,THU,FRI")
         )
+        _activeSlots.value = SlotSchedule.parseSlotDefinitionsCsv(
+            settingsRepo.getSettingValue("slot_definitions", SlotSchedule.slotDefinitionsToCsv(SlotSchedule.DEFAULT_SLOTS))
+        )
         
         _isLoading.value = false
     }
@@ -179,7 +197,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             val adminId = authRepo.userId.first()
-            val allSlots = SlotSchedule.DEFAULT_SLOTS
+            val allSlots = _activeSlots.value
             val nowTime = DateFormatter.getNowTimeString()
             val startFrom = fromTime ?: allSlots.firstOrNull { it > nowTime } ?: allSlots.last()
             val startIndex = allSlots.indexOf(startFrom).let { if (it == -1) 0 else it }
@@ -239,7 +257,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 status = "confirmed",
                 createdByAdmin = true
             )
-            val res = apptRepo.createAppointment(appt, service.durationSlots)
+            val res = apptRepo.createAppointment(appt, service.durationSlots, _activeSlots.value)
             if (res.isFailure) {
                 _errorMessage.value = ErrorTranslator.toHumanMessage(res.exceptionOrNull())
             }

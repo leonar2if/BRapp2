@@ -36,9 +36,9 @@ object TodaySlotBuilder {
     fun build(
         appointments: List<Appointment>,
         nowTime: String = DateFormatter.getNowTimeString(),
-        services: List<Service> = emptyList()
+        services: List<Service> = emptyList(),
+        slots: List<String> = SlotSchedule.DEFAULT_SLOTS
     ): List<TodaySlotItem> {
-        val slots = SlotSchedule.DEFAULT_SLOTS
         val currentSlot = slots.lastOrNull { it <= nowTime }
 
         // Para cada cita activa, calcula TODOS los turnos que ocupa según la

@@ -73,9 +73,7 @@ fun BookAppointmentScreen(
         wasDaySlotsLoading = isDaySlotsLoading
     }
 
-    val timeSlots = remember {
-        SlotSchedule.DEFAULT_SLOTS
-    }
+    val timeSlots by viewModel.activeSlots.collectAsState()
 
     val slotsChunked = remember(timeSlots) {
         timeSlots.chunked(2)

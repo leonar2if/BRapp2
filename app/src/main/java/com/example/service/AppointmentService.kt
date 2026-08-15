@@ -62,13 +62,13 @@ class AppointmentService {
     }
 
     /**
-     * Comprueba que TODOS los turnos del rango [time, time + durationSlots)
+     * Comprueba que TODOS los turnos del rango entre time y time + durationSlots (exclusivo)
      * estén libres, no solo el primero. Necesario para servicios que ocupan
      * más de un turno (sección 12 del prompt maestro). No hardcodea "2":
      * durationSlots viene siempre de Service.durationSlots.
      */
-    suspend fun isRangeAvailable(date: String, time: String, durationSlots: Int): Boolean = withContext(Dispatchers.IO) {
-        val range = com.example.utils.SlotSchedule.slotRangeFor(time, durationSlots)
+    suspend fun isRangeAvailable(date: String, time: String, durationSlots: Int, slots: List<String> = com.example.utils.SlotSchedule.DEFAULT_SLOTS): Boolean = withContext(Dispatchers.IO) {
+        val range = com.example.utils.SlotSchedule.slotRangeFor(time, durationSlots, slots)
             ?: return@withContext false // el servicio no cabe en los turnos del día
         try {
             val appts = api.getAppointmentsByDate("eq.$date")
@@ -95,12 +95,12 @@ class AppointmentService {
         }
     }
 
-    suspend fun createAppointment(appointment: Appointment, durationSlots: Int = 1): Result<Appointment> = withContext(Dispatchers.IO) {
+    suspend fun createAppointment(appointment: Appointment, durationSlots: Int = 1, slots: List<String> = com.example.utils.SlotSchedule.DEFAULT_SLOTS): Result<Appointment> = withContext(Dispatchers.IO) {
         try {
             // Comprobar que el rango completo de turnos que ocupa el servicio
             // esté libre (no solo el primer turno). Sección 12 del prompt maestro.
             if (durationSlots > 1) {
-                val available = isRangeAvailable(appointment.appointmentDate, appointment.appointmentTime, durationSlots)
+                val available = isRangeAvailable(appointment.appointmentDate, appointment.appointmentTime, durationSlots, slots)
                 if (!available) {
                     return@withContext Result.failure(Exception("Ese horario ya no está disponible para la duración de este servicio."))
                 }

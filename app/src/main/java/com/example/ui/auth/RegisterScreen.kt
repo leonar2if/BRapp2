@@ -141,30 +141,20 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
+                    com.example.ui.components.PasswordField(
                         value = password,
                         onValueChange = { password = it; if (errorMessage != null) onResetError() },
-                        label = { Text("Contraseña (mín. 6 caracteres)") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        label = "Contraseña (mín. 6 caracteres)",
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
+                    com.example.ui.components.PasswordField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it; if (errorMessage != null) onResetError() },
-                        label = { Text("Confirmar contraseña") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        label = "Confirmar contraseña",
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     if (errorMessage != null) {

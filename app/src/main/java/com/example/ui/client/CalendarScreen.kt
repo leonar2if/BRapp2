@@ -1,6 +1,7 @@
 package com.example.ui.client
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.utils.DateFormatter
 import com.example.utils.SlotSchedule
@@ -204,6 +207,9 @@ fun CalendarScreen(
                             val isPast =
                                 dateString < today
 
+                            val isToday =
+                                dateString == today
+
                             val isWorkingDay =
                                 SlotSchedule.isWorkingDay(dateString)
 
@@ -211,32 +217,20 @@ fun CalendarScreen(
                              * green = disponible
                              * red   = lleno
                              * gray  = pasado/no laborable
+                             * el círculo amarillo es solo para "hoy", no un estado más
                              */
                             val enabled =
                                 !isPast &&
                                     isWorkingDay &&
                                     status == "green"
 
-                            val backgroundColor = when {
-                                isSelected ->
-                                    MaterialTheme.colorScheme.primary
-
-                                enabled ->
-                                    MaterialTheme.colorScheme.primaryContainer
-
-                                else ->
-                                    MaterialTheme.colorScheme.surfaceVariant
-                            }
+                            val backgroundColor = if (isToday) Color(0xFFF9A825) else Color.Transparent
 
                             val textColor = when {
-                                isSelected ->
-                                    MaterialTheme.colorScheme.onPrimary
-
-                                enabled ->
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-
-                                else ->
-                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                isToday -> Color.Black
+                                status == "red" -> Color(0xFFC62828)
+                                status == "green" -> Color(0xFF2E7D32)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
 
                             Box(
@@ -246,6 +240,11 @@ fun CalendarScreen(
                                     .padding(2.dp)
                                     .clip(CircleShape)
                                     .background(backgroundColor)
+                                    .then(
+                                        if (isSelected)
+                                            Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                        else Modifier
+                                    )
                                     .clickable(
                                         enabled = enabled
                                     ) {
@@ -256,7 +255,7 @@ fun CalendarScreen(
                                 Text(
                                     text = day.toString(),
                                     color = textColor,
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal)
                                 )
                             }
                         }

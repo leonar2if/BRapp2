@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.History
@@ -52,8 +53,17 @@ fun AdminSettingsScreen(
     var phoneInput by remember(managerPhone) { mutableStateOf(Validators.toLocalDisplay(managerPhone)) }
     var hoursInput by remember(storeHours) { mutableStateOf(storeHours) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
-    var showWorkingDaysDialog by remember { mutableStateOf(false) }
+    var showScheduleScreen by remember { mutableStateOf(false) }
     val workingDaysCsv by adminViewModel.workingDaysCsv.collectAsState()
+
+    if (showScheduleScreen) {
+        androidx.activity.compose.BackHandler { showScheduleScreen = false }
+        AdminScheduleScreen(
+            viewModel = adminViewModel,
+            onBackClick = { showScheduleScreen = false }
+        )
+        return
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -204,20 +214,18 @@ fun AdminSettingsScreen(
                             } else {
                                 Text("Introduce tu nueva contraseña:")
                                 Spacer(modifier = Modifier.height(8.dp))
-                                OutlinedTextField(
+                                com.example.ui.components.PasswordField(
                                     value = newPass,
                                     onValueChange = { newPass = it; errorText = null },
-                                    label = { Text("Nueva contraseña") },
-                                    singleLine = true,
-                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                                    label = "Nueva contraseña",
+                                    showLockIcon = false
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                OutlinedTextField(
+                                com.example.ui.components.PasswordField(
                                     value = confirmPass,
                                     onValueChange = { confirmPass = it; errorText = null },
-                                    label = { Text("Confirmar contraseña") },
-                                    singleLine = true,
-                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                                    label = "Confirmar contraseña",
+                                    showLockIcon = false
                                 )
                                 if (errorText != null) {
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -320,13 +328,15 @@ fun AdminSettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Días laborables (sección 16/17 del prompt maestro): configurable,
-        // no hardcodeado a Lun-Vie. Se guarda en settings.working_days y lo
-        // consumen tanto el calendario del cliente como el del admin
-        // (SlotSchedule.isWorkingDay).
+        // Horario (turnos + días laborables), configurable de verdad: el admin
+        // puede crear tantos turnos como quiera, con la duración que quiera, y
+        // prender/apagar cualquier día de la semana. Reemplaza el viejo diálogo
+        // que solo dejaba tocar los días.
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showScheduleScreen = true },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
@@ -339,11 +349,9 @@ fun AdminSettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("Días Laborables", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                            Text("Horario", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                         }
-                        IconButton(onClick = { showWorkingDaysDialog = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
-                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = "Abrir", tint = MaterialTheme.colorScheme.primary)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     val dayLabels = mapOf(
@@ -351,8 +359,10 @@ fun AdminSettingsScreen(
                         "FRI" to "Vie", "SAT" to "Sáb", "SUN" to "Dom"
                     )
                     val activeDays = workingDaysCsv.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    val activeSlotsCount by adminViewModel.activeSlots.collectAsState()
                     Text(
-                        text = if (activeDays.isEmpty()) "Sin configurar" else activeDays.mapNotNull { dayLabels[it] }.joinToString(", "),
+                        text = (if (activeDays.isEmpty()) "Sin configurar" else activeDays.mapNotNull { dayLabels[it] }.joinToString(", ")) +
+                            " · ${activeSlotsCount.size} turnos",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -399,6 +409,10 @@ fun AdminSettingsScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Cerrar Sesión", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
             }
+        }
+
+        item {
+            com.example.ui.components.DeveloperCreditFooter()
         }
     }
 
@@ -462,56 +476,6 @@ fun AdminSettingsScreen(
             confirmButton = {
                 Button(onClick = { showHistoryDialog = false }) {
                     Text("Cerrar")
-                }
-            }
-        )
-    }
-
-    if (showWorkingDaysDialog) {
-        val dayOptions = listOf(
-            "MON" to "Lunes", "TUE" to "Martes", "WED" to "Miércoles", "THU" to "Jueves",
-            "FRI" to "Viernes", "SAT" to "Sábado", "SUN" to "Domingo"
-        )
-        var selected by remember {
-            mutableStateOf(workingDaysCsv.split(",").map { it.trim() }.filter { it.isNotBlank() }.toMutableSet())
-        }
-
-        AlertDialog(
-            onDismissRequest = { showWorkingDaysDialog = false },
-            title = { Text("Días Laborables", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
-            text = {
-                Column {
-                    dayOptions.forEach { (code, label) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(label, style = MaterialTheme.typography.bodyLarge)
-                            Checkbox(
-                                checked = code in selected,
-                                onCheckedChange = { checked ->
-                                    selected = (if (checked) selected + code else selected - code).toMutableSet()
-                                }
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        adminViewModel.saveWorkingDays(selected)
-                        showWorkingDaysDialog = false
-                    },
-                    enabled = selected.isNotEmpty()
-                ) {
-                    Text("Guardar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showWorkingDaysDialog = false }) {
-                    Text("Cancelar")
                 }
             }
         )

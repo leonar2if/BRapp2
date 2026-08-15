@@ -28,8 +28,8 @@ class AppointmentRepository {
         return list
     }
 
-    suspend fun createAppointment(appointment: Appointment, durationSlots: Int = 1): Result<Appointment> {
-        val res = appointmentService.createAppointment(appointment, durationSlots)
+    suspend fun createAppointment(appointment: Appointment, durationSlots: Int = 1, slots: List<String> = com.example.utils.SlotSchedule.DEFAULT_SLOTS): Result<Appointment> {
+        val res = appointmentService.createAppointment(appointment, durationSlots, slots)
         val newAppt = res.getOrNull()
         if (res.isSuccess && newAppt != null) {
             _appointments.value = _appointments.value + newAppt
