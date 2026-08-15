@@ -35,6 +35,7 @@ fun AdminCalendarScreen(
     val blockedSlots by viewModel.selectedDateBlockedSlots.collectAsState()
     val services by viewModel.allServices.collectAsState()
     val workingDaysCsv by viewModel.workingDaysCsv.collectAsState()
+    val activeSlots by viewModel.activeSlots.collectAsState()
     val context = LocalContext.current
 
     var showDayOffDialog by remember { mutableStateOf(false) }
@@ -206,7 +207,7 @@ fun AdminCalendarScreen(
             }
 
             if (clientStyleView) {
-                val activeSlots by viewModel.activeSlots.collectAsState()
+               
                 items(activeSlots) { slot ->
                     // Igual que ClientViewModel.isSlotOccupied: una cita ocupa
                     // service.durationSlots turnos consecutivos desde su inicio, no
