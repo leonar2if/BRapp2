@@ -381,6 +381,14 @@ private fun OccupiedTurnDetail(
         if (!appointment.lastName2.isNullOrBlank()) append(" ${appointment.lastName2}")
     }.trim()
 
+    // Contadores de visitas/faltas del cliente (pequeños, discretos, sección de contadores).
+    var clientProfile by remember(appointment.phone) { mutableStateOf<com.example.data.models.Profile?>(null) }
+    LaunchedEffect(appointment.phone) {
+        if (appointment.phone.isNotBlank()) {
+            clientProfile = viewModel.getClientProfile(appointment.phone)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -415,6 +423,18 @@ private fun OccupiedTurnDetail(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        clientProfile?.let { profile ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(2.dp))
+                Text("${profile.visitCount}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(10.dp))
+                Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFC62828), modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(2.dp))
+                Text("${profile.noShowCount}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -520,24 +540,52 @@ private fun OccupiedTurnDetail(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Button(
-            onClick = {
-                viewModel.finalizeAppointment(appointment.id)
-                isFinalized = true
-                isTimerRunning = false
-            },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            enabled = !isFinalized,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-        ) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(
+                onClick = {
+                    viewModel.finalizeAppointment(appointment.id)
+                    isFinalized = true
+                    isTimerRunning = false
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isFinalized,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "FINALIZADO",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White
+                )
+            }
+
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "FINALIZADO",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
-            )
+
+            // Botón chico y discreto: el cliente NO vino (suma a su contador de
+            // faltas). Aparte del FINALIZADO de arriba, que ya existe.
+            var noShowConfirmed by remember(appointment.id) { mutableStateOf(false) }
+            IconButton(
+                onClick = {
+                    viewModel.markAsNoShow(appointment.id)
+                    noShowConfirmed = true
+                },
+                enabled = !isFinalized && !noShowConfirmed,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFC62828).copy(alpha = if (!isFinalized && !noShowConfirmed) 0.12f else 0.05f))
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "No vino",
+                    tint = Color(0xFFC62828),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
@@ -27,13 +28,17 @@ import com.example.utils.Validators
 fun SettingsScreen(
     currentPhone: String,
     isDarkMode: Boolean,
+    currentBirthday: String? = null,
     onUpdatePhone: (String) -> Unit,
+    onUpdateBirthday: (String?) -> Unit = {},
     onToggleDarkMode: (Boolean) -> Unit,
     onChangePasswordClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
     var phoneInput by remember(currentPhone) { mutableStateOf(Validators.toLocalDisplay(currentPhone)) }
     var isEditingPhone by remember { mutableStateOf(false) }
+    var isEditingBirthday by remember { mutableStateOf(false) }
+    var birthdayInput by remember(currentBirthday) { mutableStateOf(currentBirthday ?: "") }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -112,6 +117,65 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Cake, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Cumpleaños", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    }
+                    IconButton(onClick = { isEditingBirthday = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = currentBirthday?.let { com.example.utils.DateFormatter.formatDateForDisplay(it) }
+                        ?: "No configurado - avisanos y te tenemos un detalle ese día 🎉",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (isEditingBirthday) {
+            val datePickerState = androidx.compose.material3.rememberDatePickerState()
+            DatePickerDialog(
+                onDismissRequest = { isEditingBirthday = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        if (millis != null) {
+                            val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                                .format(java.util.Date(millis))
+                            onUpdateBirthday(date)
+                        }
+                        isEditingBirthday = false
+                    }) {
+                        Text("Guardar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { isEditingBirthday = false }) {
+                        Text("Cancelar")
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
             }
         }
 

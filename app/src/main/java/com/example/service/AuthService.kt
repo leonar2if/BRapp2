@@ -207,4 +207,57 @@ class AuthService {
             Result.failure(Exception("Error cambiando contraseña: ${getErrorMessage(e)}"))
         }
     }
+
+    suspend fun updateBirthday(userId: String, birthday: String?): Result<Profile> = withContext(Dispatchers.IO) {
+        try {
+            val updated = api.updateProfile("eq.$userId", mapOf("birthday" to birthday))
+            if (updated.isNotEmpty()) Result.success(updated.first())
+            else Result.failure(Exception("Error al guardar el cumpleaños"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error guardando cumpleaños: ${getErrorMessage(e)}"))
+        }
+    }
+
+    /**
+     * Suma 1 al contador de visitas del cliente (sección de contadores). Lectura
+     * + escritura simple: el volumen de un solo admin tocando esto secuencialmente
+     * no justifica una RPC atómica extra.
+     */
+    suspend fun incrementVisitCount(phone: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val profile = api.getProfileByPhone("eq.$phone").firstOrNull() ?: return@withContext Result.success(Unit)
+            api.updateProfile("eq.${profile.id}", mapOf("visit_count" to (profile.visitCount + 1)))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun incrementNoShowCount(phone: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val profile = api.getProfileByPhone("eq.$phone").firstOrNull() ?: return@withContext Result.success(Unit)
+            api.updateProfile("eq.${profile.id}", mapOf("no_show_count" to (profile.noShowCount + 1)))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Listado completo de clientes para el directorio del admin (sección de directorio). */
+    suspend fun getAllClients(): Result<List<Profile>> = withContext(Dispatchers.IO) {
+        try {
+            Result.success(api.getAllClientProfiles("eq.client"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error cargando clientes: ${getErrorMessage(e)}"))
+        }
+    }
+
+    /** Perfil de un cliente por teléfono, para mostrar sus contadores en la galería. */
+    suspend fun getProfileByPhone(phone: String): Profile? = withContext(Dispatchers.IO) {
+        try {
+            api.getProfileByPhone("eq.$phone").firstOrNull()
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

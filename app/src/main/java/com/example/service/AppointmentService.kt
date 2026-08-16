@@ -210,4 +210,14 @@ class AppointmentService {
             Result.failure(e)
         }
     }
+
+    /** Cliente no vino a su turno (botón X pequeño de la galería, contador de faltas). */
+    suspend fun markAsNoShow(appointmentId: Long): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            api.updateAppointment("eq.$appointmentId", mapOf("status" to "no_show"))
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

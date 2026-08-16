@@ -42,6 +42,9 @@ interface SupabaseApi {
     @GET("rest/v1/profiles")
     suspend fun getProfileByPhone(@Query("phone") phone: String): List<Profile>
 
+    @GET("rest/v1/profiles?order=full_name.asc")
+    suspend fun getAllClientProfiles(@Query("role") role: String): List<Profile>
+
     @POST("rest/v1/profiles")
     suspend fun createProfile(@Body profile: Profile): List<Profile>
 

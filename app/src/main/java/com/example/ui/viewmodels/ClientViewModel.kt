@@ -69,6 +69,18 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     private val _storeHours = MutableStateFlow("10:00 - 18:00")
     val storeHours: StateFlow<String> = _storeHours
 
+    private val _userBirthday = MutableStateFlow<String?>(null)
+    val userBirthday: StateFlow<String?> = _userBirthday
+
+    fun saveBirthday(birthday: String?) {
+        viewModelScope.launch {
+            val res = authRepo.updateBirthday(birthday)
+            if (res.isSuccess) {
+                _userBirthday.value = birthday
+            }
+        }
+    }
+
     // Días laborables configurables desde Ajustes -> Horarios (admin).
     // Por defecto lunes a viernes hasta que se cargue el valor real de settings.
     private val _workingDays = MutableStateFlow(SlotSchedule.DEFAULT_WORKING_DAYS)
@@ -110,6 +122,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
             settingsRepo.getSettingValue("slot_definitions", SlotSchedule.slotDefinitionsToCsv(SlotSchedule.DEFAULT_SLOTS))
         )
         
+        _userBirthday.value = authRepo.getCurrentProfile()?.birthday
         fetchDaySlots(_selectedDate.value)
         _isLoading.value = false
     }

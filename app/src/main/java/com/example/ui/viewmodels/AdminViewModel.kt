@@ -8,6 +8,7 @@ import com.example.data.database.AppDatabase
 import com.example.data.models.Appointment
 import com.example.data.models.BlockedSlot
 import com.example.data.models.Product
+import com.example.data.models.Profile
 import com.example.data.models.Service
 import com.example.data.repository.AppointmentRepository
 import com.example.data.repository.AuthRepository
@@ -30,8 +31,31 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val apptRepo = AppointmentRepository()
     private val settingsRepo = SettingsRepository(db.settingsDao())
     private val authRepo = AuthRepository(application)
+    private val authService = com.example.service.AuthService()
     private val blockedSlotService = BlockedSlotService()
     private val clientNoteRepo = com.example.data.repository.ClientNoteRepository(db.clientNoteDao())
+
+    // Directorio de clientes (Ajustes -> Clientes). Se carga bajo demanda al
+    // abrir la pantalla, no en cada refreshData() para no pegarle a la red
+    // de más si el admin nunca la abre.
+    private val _allClients = MutableStateFlow<List<Profile>>(emptyList())
+    val allClients: StateFlow<List<Profile>> = _allClients
+
+    fun loadAllClients() {
+        viewModelScope.launch {
+            val res = authService.getAllClients()
+            _allClients.value = res.getOrNull() ?: emptyList()
+        }
+    }
+
+    /** Contadores de un cliente puntual (galería de Hoy), sin cargar el directorio completo. */
+    suspend fun getClientProfile(phone: String): Profile? = authService.getProfileByPhone(phone)
+
+    /** Clientes cuyo cumpleaños es HOY (para el aviso en Ajustes). */
+    val clientsWithBirthdayToday: StateFlow<List<Profile>> = _allClients.map { clients ->
+        val todayMonthDay = DateFormatter.getTodayDateString().takeLast(5) // "MM-dd"
+        clients.filter { it.birthday?.takeLast(5) == todayMonthDay }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun getNotesForClient(phone: String): Flow<List<com.example.data.models.ClientNoteEntity>> =
         clientNoteRepo.getNotesForClient(phone)
@@ -131,6 +155,39 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshData()
+        startAutoExpireLoop()
+    }
+
+    /**
+     * Cada minuto:
+     * 1. Si algún turno de HOY ya pasó de hora y sigue "confirmed"/"in_progress"
+     *    (el admin no lo cerró), se marca como atendido solo - el cliente ya
+     *    vino, no tiene sentido que quede colgado esperando un click.
+     * 2. Si cambió el día real (medianoche), refresca todo para que "Hoy" pase
+     *    a ser el día nuevo automáticamente - el día viejo deja de poder tocarse
+     *    porque ya no es el que se está mostrando/consultando.
+     */
+    private fun startAutoExpireLoop() {
+        viewModelScope.launch {
+            var lastKnownToday = DateFormatter.getTodayDateString()
+            while (true) {
+                delay(60_000)
+                val nowDate = DateFormatter.getTodayDateString()
+                val nowTime = DateFormatter.getNowTimeString()
+
+                val stale = _todayAppointments.value.filter {
+                    it.appointmentDate == lastKnownToday &&
+                        it.appointmentTime.take(5) < nowTime &&
+                        (it.status == "confirmed" || it.status == "in_progress")
+                }
+                stale.forEach { markAsAttended(it.id) }
+
+                if (nowDate != lastKnownToday) {
+                    lastKnownToday = nowDate
+                    refreshData()
+                }
+            }
+        }
     }
 
     fun refreshData() {
@@ -321,7 +378,25 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun markAsAttended(appointmentId: Long) {
         viewModelScope.launch {
             val adminId = authRepo.userId.first()
+            val target = (_todayAppointments.value + _selectedDateAppointments.value + _allAppointments.value)
+                .firstOrNull { it.id == appointmentId }
             apptRepo.markAsAttended(appointmentId, adminId)
+            if (target != null && target.phone.isNotBlank()) {
+                authService.incrementVisitCount(target.phone)
+            }
+            refreshData()
+        }
+    }
+
+    /** Botón X pequeño de la galería: el cliente no vino, suma a su contador de faltas. */
+    fun markAsNoShow(appointmentId: Long) {
+        viewModelScope.launch {
+            val target = (_todayAppointments.value + _selectedDateAppointments.value + _allAppointments.value)
+                .firstOrNull { it.id == appointmentId }
+            apptRepo.markAsNoShow(appointmentId)
+            if (target != null && target.phone.isNotBlank()) {
+                authService.incrementNoShowCount(target.phone)
+            }
             refreshData()
         }
     }

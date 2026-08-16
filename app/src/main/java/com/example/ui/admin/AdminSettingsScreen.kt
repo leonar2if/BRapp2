@@ -47,13 +47,12 @@ fun AdminSettingsScreen(
 
     var showHistoryDialog by remember { mutableStateOf(false) }
     var isEditingContact by remember { mutableStateOf(false) }
-    var isEditingHours by remember { mutableStateOf(false) }
 
     var nameInput by remember(managerName) { mutableStateOf(managerName) }
     var phoneInput by remember(managerPhone) { mutableStateOf(Validators.toLocalDisplay(managerPhone)) }
-    var hoursInput by remember(storeHours) { mutableStateOf(storeHours) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showScheduleScreen by remember { mutableStateOf(false) }
+    var showClientsScreen by remember { mutableStateOf(false) }
     val workingDaysCsv by adminViewModel.workingDaysCsv.collectAsState()
 
     if (showScheduleScreen) {
@@ -61,6 +60,15 @@ fun AdminSettingsScreen(
         AdminScheduleScreen(
             viewModel = adminViewModel,
             onBackClick = { showScheduleScreen = false }
+        )
+        return
+    }
+
+    if (showClientsScreen) {
+        androidx.activity.compose.BackHandler { showClientsScreen = false }
+        AdminClientsScreen(
+            viewModel = adminViewModel,
+            onBackClick = { showClientsScreen = false }
         )
         return
     }
@@ -273,61 +281,6 @@ fun AdminSettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Horarios de apertura
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("Horarios de la Barbería", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                        }
-                        if (!isEditingHours) {
-                            IconButton(onClick = { isEditingHours = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (isEditingHours) {
-                        OutlinedTextField(
-                            value = hoursInput,
-                            onValueChange = { hoursInput = it },
-                            label = { Text("Horarios (e.g. Lun-Sab 10:00 - 20:00)") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            TextButton(onClick = { isEditingHours = false; hoursInput = storeHours }) {
-                                Text("Cancelar")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = {
-                                adminViewModel.saveStoreHours(hoursInput)
-                                isEditingHours = false
-                            }) {
-                                Text("Guardar")
-                            }
-                        }
-                    } else {
-                        Text(text = storeHours, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
         // Horario (turnos + días laborables), configurable de verdad: el admin
         // puede crear tantos turnos como quiera, con la duración que quiera, y
         // prender/apagar cualquier día de la semana. Reemplaza el viejo diálogo
@@ -366,6 +319,44 @@ fun AdminSettingsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Directorio de clientes: lista completa + aviso de cumpleaños de hoy.
+        item {
+            LaunchedEffect(Unit) { adminViewModel.loadAllClients() }
+            val birthdayToday by adminViewModel.clientsWithBirthdayToday.collectAsState()
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showClientsScreen = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Clientes", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = "Abrir", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    if (birthdayToday.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "🎂 ${birthdayToday.size} cliente(s) cumple(n) años hoy",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF8A6D00)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

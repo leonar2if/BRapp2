@@ -57,6 +57,17 @@ class AppointmentRepository {
         return res
     }
 
+    /** Marca que el cliente no vino a su turno (botón X de la galería). */
+    suspend fun markAsNoShow(appointmentId: Long): Result<Boolean> {
+        val res = appointmentService.markAsNoShow(appointmentId)
+        if (res.isSuccess) {
+            _appointments.value = _appointments.value.map {
+                if (it.id == appointmentId) it.copy(status = "no_show") else it
+            }
+        }
+        return res
+    }
+
     suspend fun rescheduleNextMonth(appointment: Appointment, adminId: String): Result<Appointment> {
         return appointmentService.rescheduleNextMonth(appointment, adminId)
     }

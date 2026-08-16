@@ -207,7 +207,6 @@ fun AdminCalendarScreen(
             }
 
             if (clientStyleView) {
-               
                 items(activeSlots) { slot ->
                     // Igual que ClientViewModel.isSlotOccupied: una cita ocupa
                     // service.durationSlots turnos consecutivos desde su inicio, no

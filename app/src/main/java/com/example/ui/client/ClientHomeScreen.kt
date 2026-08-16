@@ -136,8 +136,12 @@ fun ClientHomeScreen(
                     SettingsScreen(
                         currentPhone = userPhone,
                         isDarkMode = isDarkMode,
+                        currentBirthday = clientViewModel.userBirthday.collectAsState().value,
                         onUpdatePhone = { newPhone ->
                             clientViewModel.updatePhone(newPhone)
+                        },
+                        onUpdateBirthday = { birthday ->
+                            clientViewModel.saveBirthday(birthday)
                         },
                         onToggleDarkMode = { enabled ->
                             authViewModel.setDarkMode(enabled)

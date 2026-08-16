@@ -88,6 +88,18 @@ class AuthRepository(context: Context) {
         return authService.changePassword(newPassword)
     }
 
+    /** Perfil completo del usuario actual (para leer el cumpleaños guardado). */
+    suspend fun getCurrentProfile(): Profile? {
+        val id = userId.first()
+        if (id.isEmpty()) return null
+        return SupabaseClient.api.getProfileById("eq.$id").firstOrNull()
+    }
+
+    suspend fun updateBirthday(birthday: String?): Result<Profile> {
+        val id = userId.first()
+        return authService.updateBirthday(id, birthday)
+    }
+
     suspend fun setDarkMode(enabled: Boolean) {
         prefs.setDarkMode(enabled)
     }
