@@ -28,7 +28,7 @@ import com.example.utils.DateFormatter
  * datos de cada cliente menos la contraseña (que ni siquiera se guarda acá,
  * vive en auth.users de Supabase). Avisa si hoy es el cumpleaños de alguno.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminClientsScreen(
     viewModel: AdminViewModel,
@@ -147,6 +147,7 @@ fun AdminClientsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ClientProfileDetail(profile: Profile, onBackClick: () -> Unit) {
     Scaffold(
