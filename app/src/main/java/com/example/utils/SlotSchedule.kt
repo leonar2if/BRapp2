@@ -71,11 +71,25 @@ object SlotSchedule {
             .map { it.trim() }
             .filter { it.isNotBlank() && timeRegex.matches(it) }
             .distinct()
-            .sorted()
-        return if (parsed.isEmpty()) DEFAULT_SLOTS else parsed
+        return if (parsed.isEmpty()) DEFAULT_SLOTS else sortSlots(parsed)
     }
 
-    fun slotDefinitionsToCsv(slots: List<String>): String = slots.sorted().joinToString(",")
+    fun slotDefinitionsToCsv(slots: List<String>): String = sortSlots(slots).joinToString(",")
+
+    /**
+     * Ordena turnos por HORA REAL (minutos desde medianoche), no por texto.
+     * El orden por texto (.sorted() de String) se rompe si hay algún turno
+     * guardado con formato de un dígito ("9:00" en vez de "09:00"), porque
+     * "9" ordena después de "1" como carácter. Esto es a prueba de eso.
+     */
+    fun sortSlots(slots: List<String>): List<String> = slots.sortedBy { timeToMinutes(it) }
+
+    private fun timeToMinutes(time: String): Int {
+        val parts = time.trim().split(":")
+        val h = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: 0
+        val m = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
+        return h * 60 + m
+    }
 
     private val DAY_CODE_TO_CALENDAR = mapOf(
         "SUN" to Calendar.SUNDAY, "MON" to Calendar.MONDAY, "TUE" to Calendar.TUESDAY,
