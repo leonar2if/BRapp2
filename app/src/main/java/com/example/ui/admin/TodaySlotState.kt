@@ -126,6 +126,30 @@ object TodaySlotBuilder {
     }
 
     /** Texto "en 45 min" / "en 1h 30min" hasta la próxima cita reservada (no cancelada) a partir de un slot libre. */
+    /**
+     * Título + subtítulo para un turno libre en la galería (sección 8).
+     * - Si ya no hay ningún turno después de este en el día: título cambia a
+     *   "Ya no tiene más turnos hoy." y no hay subtítulo.
+     * - Si el turno ya pasó de hora: "Este turno libre ya concluyó."
+     * - Si no pasó: "Este turno está libre." + subtítulo con el turno
+     *   siguiente A ESTE (no el más próximo desde "ahora", ni el primero del
+     *   día - el bug viejo).
+     */
+    fun freeSlotStatusText(
+        items: List<TodaySlotItem>,
+        currentTime: String,
+        nowTime: String = DateFormatter.getNowTimeString()
+    ): Pair<String, String?> {
+        val nextItem = items.firstOrNull { it.time > currentTime }
+        val hasPassed = currentTime < nowTime
+
+        return when {
+            nextItem == null -> "Ya no tiene más turnos hoy." to null
+            hasPassed -> "Este turno libre ya concluyó." to null
+            else -> "Este turno está libre." to "El siguiente turno es a las ${DateFormatter.formatTimeForDisplay(nextItem.time)}."
+        }
+    }
+
     fun nextAppointmentLabel(items: List<TodaySlotItem>, fromSlot: String, nowTime: String = DateFormatter.getNowTimeString()): String {
         val next = items.firstOrNull {
             it.appointment != null && it.appointment.status != "attended" && it.time > fromSlot

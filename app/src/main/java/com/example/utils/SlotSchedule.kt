@@ -39,6 +39,27 @@ object SlotSchedule {
     }
 
     /**
+     * A partir de [fromDateStr] (inclusive), busca el próximo día que sea
+     * laborable Y no esté en el pasado. Usado para que el día seleccionado
+     * por defecto ("hoy") salte automáticamente a un día válido si hoy no lo
+     * es (sección 7 - bug del día actual). Busca hasta 60 días adelante para
+     * no colgarse si por error quedó una config sin ningún día laborable.
+     */
+    fun findNextValidDay(fromDateStr: String, workingDays: Set<Int> = DEFAULT_WORKING_DAYS): String {
+        val today = DateFormatter.getTodayDateString()
+        val start = if (fromDateStr < today) today else fromDateStr
+        var date = DateFormatter.stringToDate(start) ?: return start
+        val cal = Calendar.getInstance()
+        cal.time = date
+        repeat(60) {
+            val candidate = DateFormatter.dateToString(cal.time)
+            if (cal.get(Calendar.DAY_OF_WEEK) in workingDays) return candidate
+            cal.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return start
+    }
+
+    /**
      * Convierte el CSV guardado en settings.slot_definitions (ej. "10:00,10:30,
      * 11:00,...") a la lista de turnos activa. Valida formato "HH:mm", elimina
      * duplicados y ordena cronológicamente. Si viene vacío/corrupto, cae en

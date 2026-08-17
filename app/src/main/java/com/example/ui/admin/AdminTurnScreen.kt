@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.models.Appointment
+import com.example.utils.Validators
 import com.example.ui.viewmodels.AdminViewModel
 import com.example.utils.DateFormatter
 
@@ -56,6 +57,7 @@ fun AdminTurnScreen(
     val activeSlots by viewModel.activeSlots.collectAsState()
 
     var showBlockDialog by remember { mutableStateOf(false) }
+    var showAffectedClientsDialog by remember { mutableStateOf(false) }
     var showEndDayDialog by remember { mutableStateOf(false) }
     var galleryStartIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -149,12 +151,32 @@ fun AdminTurnScreen(
         BlockRestOfDayDialog(
             timeSlots = activeSlots,
             currentTime = DateFormatter.getNowTimeString(),
+            isToday = true,
+            affectedCount = { fromTime, wholeDay ->
+                val slotsToCheck = if (wholeDay) activeSlots else {
+                    val start = fromTime ?: activeSlots.firstOrNull { it > DateFormatter.getNowTimeString() } ?: activeSlots.last()
+                    val idx = activeSlots.indexOf(start).let { if (it == -1) 0 else it }
+                    activeSlots.subList(idx, activeSlots.size)
+                }
+                todayAppts.count {
+                    it.status != "canceled" && it.status != "attended" && it.status != "no_show" &&
+                        it.appointmentTime.take(5) in slotsToCheck
+                }
+            },
             onDismiss = { showBlockDialog = false },
-            onConfirm = { fromTime ->
-                viewModel.blockRestOfDay(today, fromTime)
+            onConfirm = { fromTime, wholeDay ->
+                viewModel.blockRestOfDay(today, fromTime, wholeDay)
                 showBlockDialog = false
+                showAffectedClientsDialog = true
             }
         )
+    }
+
+    if (showAffectedClientsDialog) {
+        val affected by viewModel.lastBlockAffectedClients.collectAsState()
+        if (affected.isNotEmpty()) {
+            AffectedClientsDialog(affected = affected, onDismiss = { showAffectedClientsDialog = false })
+        }
     }
 
     if (showEndDayDialog) {
@@ -354,8 +376,10 @@ private fun TodayGallery(
                     viewModel = viewModel
                 )
             } else {
+                val (title, subtitle) = TodaySlotBuilder.freeSlotStatusText(items, item.time)
                 FreeTurnDetail(
-                    label = TodaySlotBuilder.nextAppointmentLabel(items, item.time),
+                    title = title,
+                    subtitle = subtitle,
                     isCanceled = item.canceledAppointment != null
                 )
             }
@@ -591,7 +615,7 @@ private fun OccupiedTurnDetail(
 }
 
 @Composable
-private fun FreeTurnDetail(label: String, isCanceled: Boolean) {
+private fun FreeTurnDetail(title: String, subtitle: String?, isCanceled: Boolean) {
     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -602,17 +626,19 @@ private fun FreeTurnDetail(label: String, isCanceled: Boolean) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isCanceled) "Este turno fue cancelado" else "Este turno está libre",
+                    text = if (isCanceled) "Este turno fue cancelado" else title,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (!isCanceled && subtitle != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -624,28 +650,32 @@ private fun FreeTurnDetail(label: String, isCanceled: Boolean) {
  * de aplicar. Se movió aquí (vista Activo) según lo pedido.
  */
 @Composable
-private fun BlockRestOfDayDialog(
+fun BlockRestOfDayDialog(
     timeSlots: List<String>,
     currentTime: String,
+    isToday: Boolean,
+    affectedCount: (fromTime: String?, wholeDay: Boolean) -> Int,
     onDismiss: () -> Unit,
-    onConfirm: (fromTime: String?) -> Unit
+    onConfirm: (fromTime: String?, wholeDay: Boolean) -> Unit
 ) {
-    var selectedOption by remember { mutableStateOf("now") } // "now" | "fromSlot"
+    var selectedOption by remember { mutableStateOf(if (isToday) "now" else "fromSlot") } // "now" | "fromSlot" | "wholeDay"
     var selectedSlot by remember { mutableStateOf(timeSlots.firstOrNull { it > currentTime } ?: timeSlots.last()) }
     var showConfirmStep by remember { mutableStateOf(false) }
 
     if (!showConfirmStep) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Tomarse libre el resto del día", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+            title = { Text("Marcar como no disponible", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
             text = {
                 Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        RadioButton(selected = selectedOption == "now", onClick = { selectedOption = "now" })
-                        Text("Desde ahora", style = MaterialTheme.typography.bodyLarge)
+                    if (isToday) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            RadioButton(selected = selectedOption == "now", onClick = { selectedOption = "now" })
+                            Text("Desde ahora", style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -653,6 +683,13 @@ private fun BlockRestOfDayDialog(
                     ) {
                         RadioButton(selected = selectedOption == "fromSlot", onClick = { selectedOption = "fromSlot" })
                         Text("Desde un turno", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        RadioButton(selected = selectedOption == "wholeDay", onClick = { selectedOption = "wholeDay" })
+                        Text("Día completo", style = MaterialTheme.typography.bodyLarge)
                     }
 
                     if (selectedOption == "fromSlot") {
@@ -686,23 +723,36 @@ private fun BlockRestOfDayDialog(
             }
         )
     } else {
-        val fromTime = if (selectedOption == "now") null else selectedSlot
+        val wholeDay = selectedOption == "wholeDay"
+        val fromTime = if (selectedOption == "now" || wholeDay) null else selectedSlot
         val slotIndex = if (fromTime != null) timeSlots.indexOf(fromTime) + 1 else null
+        val affected = affectedCount(fromTime, wholeDay)
+
         AlertDialog(
             onDismissRequest = { showConfirmStep = false },
             title = { Text("Confirmar", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
             text = {
-                Text(
-                    if (fromTime == null) {
-                        "¿Quieres marcar como libre el resto del día desde ahora?"
-                    } else {
-                        "¿Quieres marcar como libre el resto del día desde el turno $slotIndex — $fromTime?"
+                Column {
+                    Text(
+                        when {
+                            wholeDay -> "¿Seguro que quieres dejar el día completo libre?"
+                            fromTime == null -> "¿Seguro que quieres dejar el resto del día libre desde ahora?"
+                            else -> "¿Seguro que quieres dejar el resto del día libre desde el turno $slotIndex — $fromTime?"
+                        }
+                    )
+                    if (affected > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Esto afectará $affected reserva(s) existente(s): se cancelarán y el cliente recibirá un aviso.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
-                )
+                }
             },
             confirmButton = {
                 Button(
-                    onClick = { onConfirm(fromTime) },
+                    onClick = { onConfirm(fromTime, wholeDay) },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
                     Text("Confirmar")
@@ -715,6 +765,49 @@ private fun BlockRestOfDayDialog(
             }
         )
     }
+}
+
+/** Lista de clientes afectados por un bloqueo de día/turnos, con botón para llamarlos (sección 6). */
+@Composable
+fun AffectedClientsDialog(affected: List<Appointment>, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Clientes afectados", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+        text = {
+            Column {
+                Text(
+                    "Ya se les canceló el turno y se les avisó en la app. Podés llamarlos igual si querés avisarles personalmente:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                affected.forEach { appt ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(appt.fullName.ifBlank { "Cliente" }, style = MaterialTheme.typography.bodyMedium)
+                            Text(appt.appointmentTime.take(5), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (appt.phone.isNotBlank()) {
+                            TextButton(onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${Validators.COUNTRY_CODE}${appt.phone}"))
+                                context.startActivity(intent)
+                            }) {
+                                Text("Llamar")
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) { Text("Listo") }
+        }
+    )
 }
 
 /**

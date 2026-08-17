@@ -39,7 +39,7 @@ fun AdminCalendarScreen(
     val context = LocalContext.current
 
     var showDayOffDialog by remember { mutableStateOf(false) }
-    var sendNotification by remember { mutableStateOf(true) }
+    var showAffectedClientsDialog by remember { mutableStateOf(false) }
     var clientStyleView by remember { mutableStateOf(true) }
     var showQuickBookingFor by remember { mutableStateOf<String?>(null) }
 
@@ -287,92 +287,35 @@ fun AdminCalendarScreen(
     }
 
     if (showDayOffDialog) {
-        val activeApptsCount = dateAppts.count {
-            it.status == "confirmed" ||
-                it.status == "in_progress"
-        }
-
-        AlertDialog(
-            onDismissRequest = {
+        BlockRestOfDayDialog(
+            timeSlots = activeSlots,
+            currentTime = DateFormatter.getNowTimeString(),
+            isToday = selectedDate == DateFormatter.getTodayDateString(),
+            affectedCount = { fromTime, wholeDay ->
+                val slotsToCheck = if (wholeDay) activeSlots else {
+                    val start = fromTime ?: activeSlots.firstOrNull { it > DateFormatter.getNowTimeString() } ?: activeSlots.last()
+                    val idx = activeSlots.indexOf(start).let { if (it == -1) 0 else it }
+                    activeSlots.subList(idx, activeSlots.size)
+                }
+                dateAppts.count {
+                    it.status != "canceled" && it.status != "attended" && it.status != "no_show" &&
+                        it.appointmentTime.take(5) in slotsToCheck
+                }
+            },
+            onDismiss = { showDayOffDialog = false },
+            onConfirm = { fromTime, wholeDay ->
+                viewModel.blockRestOfDay(selectedDate, fromTime, wholeDay)
                 showDayOffDialog = false
-            },
-            title = {
-                Text(
-                    text = "Marcar Día Libre",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "¿Deseas marcar el día ${
-                            DateFormatter.formatDateForDisplay(selectedDate)
-                        } como día libre/inactivo?"
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (activeApptsCount > 0) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "⚠️ Hay $activeApptsCount reservas confirmadas para este día que serán canceladas.",
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = sendNotification,
-                                onCheckedChange = {
-                                    sendNotification = it
-                                }
-                            )
-
-                            Text(
-                                text = "Enviar notificación de cancelación a los clientes",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.markDayOff(
-                            selectedDate,
-                            sendNotification
-                        )
-                        showDayOffDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Confirmar y Cancelar Citas")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showDayOffDialog = false
-                    }
-                ) {
-                    Text("Volver")
-                }
+                showAffectedClientsDialog = true
             }
         )
+    }
+
+    if (showAffectedClientsDialog) {
+        val affected by viewModel.lastBlockAffectedClients.collectAsState()
+        if (affected.isNotEmpty()) {
+            AffectedClientsDialog(affected = affected, onDismiss = { showAffectedClientsDialog = false })
+        }
     }
 
     val quickBookingTime = showQuickBookingFor

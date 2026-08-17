@@ -23,7 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.ui.components.PhoneField
 import com.example.utils.Validators
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 @Composable
 fun SettingsScreen(
     currentPhone: String,
@@ -145,7 +145,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = currentBirthday?.let { com.example.utils.DateFormatter.formatDateForDisplay(it) }
-                        ?: "No configurado - avisanos y te tenemos un detalle ese día 🎉",
+                        ?: "Indica tu fecha de cumpleaños para conocer un poco más sobre ti.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -36,6 +36,7 @@ fun AppointmentCard(
     val statusColor = when (appointment.status) {
         "attended" -> Color(0xFF2E7D32) // Green
         "canceled" -> Color(0xFFC62828) // Red
+        "no_show" -> Color(0xFFC62828) // Red - ausente
         "in_progress" -> Color(0xFFEF6C00) // Orange
         else -> MaterialTheme.colorScheme.primary // Blue/Default
     }
@@ -43,6 +44,7 @@ fun AppointmentCard(
     val statusText = when (appointment.status) {
         "attended" -> "Atendido"
         "canceled" -> "Cancelado"
+        "no_show" -> "Ausente"
         "in_progress" -> "En curso"
         else -> "Confirmado"
     }

@@ -107,7 +107,7 @@ fun ClientHomeScreen(
                         if (com.example.utils.NetworkUtils.isOnline(context)) {
                             clientViewModel.refreshDataAwait()
                             isPullRefreshing = false
-                            refreshFeedback.notifyRefreshed()
+                            refreshFeedback.notifyRefreshed(message = "Actualizado", freshDurationMs = 60_000)
                         } else {
                             isPullRefreshing = false
                             refreshFeedback.notifyRefreshFailed()
@@ -121,7 +121,7 @@ fun ClientHomeScreen(
                     BookAppointmentScreen(
                         viewModel = clientViewModel,
                         onNavigateBackToHome = { currentTab = 0 },
-                        onDaySlotsRefreshed = { refreshFeedback.notifyRefreshed() }
+                        onDaySlotsRefreshed = { refreshFeedback.notifyRefreshed(message = "Actualizado", freshDurationMs = 60_000) }
                     )
                 }
                 1 -> {
@@ -158,6 +158,27 @@ fun ClientHomeScreen(
             }
             RefreshToast(refreshFeedback.toastMessage, isError = refreshFeedback.isError)
         }
+    }
+
+    val cancellationNotice by clientViewModel.cancellationNotice.collectAsState()
+    if (cancellationNotice != null) {
+        val appt = cancellationNotice!!
+        AlertDialog(
+            onDismissRequest = { clientViewModel.dismissCancellationNotice() },
+            title = { Text("Tu turno fue cancelado") },
+            text = {
+                Text(
+                    "Lamentamos las molestias: tu turno del ${com.example.utils.DateFormatter.formatDateForDisplay(appt.appointmentDate)} " +
+                        "a las ${com.example.utils.DateFormatter.formatTimeForDisplay(appt.appointmentTime)} fue cancelado por la barbería. " +
+                        "Podés reservar otro horario cuando quieras."
+                )
+            },
+            confirmButton = {
+                Button(onClick = { clientViewModel.dismissCancellationNotice() }) {
+                    Text("Entendido")
+                }
+            }
+        )
     }
 
     if (showChangePasswordDialog) {

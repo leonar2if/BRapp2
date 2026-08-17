@@ -42,17 +42,15 @@ object Validators {
     }
 
     /**
-     * Normaliza un número LOCAL (8 dígitos, empieza en 5) a formato completo
-     * "53XXXXXXXX" para guardarlo/usarlo igual que el resto del sistema ya
-     * usa el teléfono (login construye "$cleanPhone@barberia.cu"). Mantiene
-     * compatibilidad con datos existentes: si ya viene con 53 delante o con
-     * +, se limpia igual.
+     * Normaliza un número a formato LOCAL (8 dígitos, sin +53/53 delante) para
+     * guardarlo en Supabase y para construir el email de auth. Antes se
+     * guardaba con "53" antepuesto ("53XXXXXXXX"); ya no: el prefijo del país
+     * es solo un dato de UI, nunca debe persistirse.
      */
     fun cleanPhoneNumber(phone: String): String {
         val digitsOnly = phone.trim().filter { it.isDigit() }
         return when {
-            digitsOnly.startsWith("53") && digitsOnly.length == 10 -> digitsOnly
-            digitsOnly.length == 8 && digitsOnly.startsWith("5") -> "53$digitsOnly"
+            digitsOnly.startsWith("53") && digitsOnly.length == 10 -> digitsOnly.removePrefix("53")
             else -> digitsOnly
         }
     }

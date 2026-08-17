@@ -182,7 +182,7 @@ fun AdminScheduleScreen(
                             !timeRegex.matches(newSlotTime) -> slotError = "Formato inválido"
                             newSlotTime in slots -> slotError = "Ese turno ya existe"
                             else -> {
-                                slots = (slots + newSlotTime).toMutableList()
+                                slots = (slots + newSlotTime).sorted().toMutableList()
                                 newSlotTime = ""
                                 slotError = null
                             }

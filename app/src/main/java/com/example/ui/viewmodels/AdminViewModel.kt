@@ -159,13 +159,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Cada minuto:
-     * 1. Si algún turno de HOY ya pasó de hora y sigue "confirmed"/"in_progress"
-     *    (el admin no lo cerró), se marca como atendido solo - el cliente ya
-     *    vino, no tiene sentido que quede colgado esperando un click.
-     * 2. Si cambió el día real (medianoche), refresca todo para que "Hoy" pase
-     *    a ser el día nuevo automáticamente - el día viejo deja de poder tocarse
-     *    porque ya no es el que se está mostrando/consultando.
+     * Cada minuto revisa si cambió el día (medianoche). El admin tiene TODO el
+     * día para confirmar (✓) o marcar no-show (✗) cada turno a mano - durante
+     * el día no se toca nada automáticamente. Solo si llega la medianoche y el
+     * admin se olvidó de cerrar algo, esos turnos que quedaron "confirmed"/
+     * "in_progress" se marcan como atendidos de una vez y el día queda cerrado.
      */
     private fun startAutoExpireLoop() {
         viewModelScope.launch {
@@ -173,16 +171,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             while (true) {
                 delay(60_000)
                 val nowDate = DateFormatter.getTodayDateString()
-                val nowTime = DateFormatter.getNowTimeString()
-
-                val stale = _todayAppointments.value.filter {
-                    it.appointmentDate == lastKnownToday &&
-                        it.appointmentTime.take(5) < nowTime &&
-                        (it.status == "confirmed" || it.status == "in_progress")
-                }
-                stale.forEach { markAsAttended(it.id) }
 
                 if (nowDate != lastKnownToday) {
+                    val stale = _todayAppointments.value.filter {
+                        it.appointmentDate == lastKnownToday &&
+                            (it.status == "confirmed" || it.status == "in_progress")
+                    }
+                    stale.forEach { markAsAttended(it.id) }
                     lastKnownToday = nowDate
                     refreshData()
                 }
@@ -250,19 +245,47 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
      * No bloquea turnos que ya tienen una cita confirmada (esos no se tocan;
      * el admin puede cancelarlos aparte si hace falta).
      */
-    fun blockRestOfDay(date: String, fromTime: String?) {
+    private val _lastBlockAffectedClients = MutableStateFlow<List<Appointment>>(emptyList())
+    val lastBlockAffectedClients: StateFlow<List<Appointment>> = _lastBlockAffectedClients
+
+    /**
+     * Deja el día sin disponibilidad (sección 5): "día completo" (wholeDay),
+     * "desde ahora" (fromTime=null, wholeDay=false) o "desde un turno"
+     * (fromTime). A diferencia de antes, ahora SÍ cancela las reservas que
+     * caigan en el rango bloqueado (sección 6) - antes se saltaban sin
+     * tocarlas. Cada una queda marcada cancel_reason="admin_block" para que
+     * el cliente reciba el aviso con disculpa la próxima vez que abra la app.
+     */
+    fun blockRestOfDay(date: String, fromTime: String?, wholeDay: Boolean = false) {
         viewModelScope.launch {
             _isLoading.value = true
             val adminId = authRepo.userId.first()
             val allSlots = _activeSlots.value
             val nowTime = DateFormatter.getNowTimeString()
-            val startFrom = fromTime ?: allSlots.firstOrNull { it > nowTime } ?: allSlots.last()
-            val startIndex = allSlots.indexOf(startFrom).let { if (it == -1) 0 else it }
-            val occupiedTimes = (if (date == DateFormatter.getTodayDateString()) _todayAppointments.value else _selectedDateAppointments.value)
-                .filter { it.status != "canceled" }
-                .map { it.appointmentTime.take(5) }
-                .toSet()
-            val slotsToBlock = allSlots.subList(startIndex, allSlots.size).filter { it !in occupiedTimes }
+
+            val slotsToBlock: List<String> = if (wholeDay) {
+                allSlots
+            } else {
+                val startFrom = fromTime ?: allSlots.firstOrNull { it > nowTime } ?: allSlots.last()
+                val startIndex = allSlots.indexOf(startFrom).let { if (it == -1) 0 else it }
+                allSlots.subList(startIndex, allSlots.size)
+            }
+
+            val dayAppts = if (date == DateFormatter.getTodayDateString()) _todayAppointments.value else _selectedDateAppointments.value
+            val affected = dayAppts.filter {
+                it.status != "canceled" && it.status != "attended" && it.status != "no_show" &&
+                    it.appointmentTime.take(5) in slotsToBlock
+            }
+
+            affected.forEach { appt ->
+                apptRepo.cancelAppointment(appt.id, adminId)
+                LocalNotificationScheduler.cancelAppointmentReminders(getApplication(), appt.id.toString())
+                com.example.service.SupabaseClient.api.updateAppointment(
+                    "eq.${appt.id}",
+                    mapOf("cancel_reason" to "admin_block")
+                )
+            }
+            _lastBlockAffectedClients.value = affected
 
             if (slotsToBlock.isNotEmpty()) {
                 blockedSlotService.blockSlots(date, slotsToBlock, adminId)
@@ -508,25 +531,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Día completo no disponible desde Agenda (sección 5). Reutiliza
+     * blockRestOfDay en modo "día completo" - antes tenía su propia copia de
+     * la lógica de cancelación con un aviso de notificación que en realidad
+     * no hacía nada (comentario "// In real FCM..." sin código real).
+     */
     fun markDayOff(date: String, sendNotification: Boolean) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            val appts = apptRepo.fetchAppointmentsByDate(date)
-            val adminId = authRepo.userId.first()
-            for (a in appts) {
-                if (a.status == "confirmed" || a.status == "in_progress") {
-                    val res = apptRepo.cancelAppointment(a.id, adminId)
-                    if (res.isSuccess) {
-                        LocalNotificationScheduler.cancelAppointmentReminders(getApplication(), a.id.toString())
-                    }
-                    if (sendNotification) {
-                        // In real FCM, we trigger server push or local notification
-                    }
-                }
-            }
-            refreshData()
-            _isLoading.value = false
-        }
+        blockRestOfDay(date, fromTime = null, wholeDay = true)
     }
 
     fun setDarkMode(enabled: Boolean) {

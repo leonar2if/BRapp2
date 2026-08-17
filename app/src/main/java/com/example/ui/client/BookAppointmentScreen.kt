@@ -315,17 +315,22 @@ fun BookAppointmentScreen(
                                                 viewModel.isSlotOccupied(
                                                     slot
                                                 )
+                                            val isBlocked =
+                                                viewModel.isSlotBlocked(slot)
 
                                             TimeSlotWidget(
                                                 time = slot,
                                                 isOccupied = isOccupied,
+                                                isBlocked = isBlocked,
                                                 isSelected =
                                                     selectedTime == slot,
-
+                                                useAbbreviatedLabels = true,
                                                 onClick = {
-                                                    viewModel.selectTime(
-                                                        slot
-                                                    )
+                                                    if (!isBlocked) {
+                                                        viewModel.selectTime(
+                                                            slot
+                                                        )
+                                                    }
                                                 }
                                             )
                                         }

@@ -22,6 +22,7 @@ fun TimeSlotWidget(
     isOccupied: Boolean,
     isSelected: Boolean = false,
     isBlocked: Boolean = false, // turno bloqueado por el admin (⊘), sin cita
+    useAbbreviatedLabels: Boolean = false, // true en la vista del cliente: "N.D." en vez de "NO DISPONIBLE" para que quepa
     onClick: () -> Unit
 ) {
     val effectivelyUnavailable = isOccupied || isBlocked
@@ -83,7 +84,7 @@ fun TimeSlotWidget(
             ) {
                 Text(
                     text = when {
-                        isBlocked -> "NO DISPONIBLE"
+                        isBlocked -> if (useAbbreviatedLabels) "N.D." else "NO DISPONIBLE"
                         isOccupied -> "LLENO"
                         else -> "LIBRE"
                     },

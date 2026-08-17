@@ -26,5 +26,6 @@ data class Appointment(
     @Json(name = "original_appointment_id") val originalAppointmentId: Long? = null,
     @Json(name = "canceled_by") val canceledBy: String? = null,
     @Json(name = "canceled_at") val canceledAt: String? = null,
+    @Json(name = "cancel_reason") val cancelReason: String? = null, // "admin_block" = cancelado por el admin al dejar un turno/día no disponible
     @Json(name = "created_at") val createdAt: String? = null
 )

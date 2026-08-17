@@ -24,6 +24,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     private val db = Room.databaseBuilder(application, AppDatabase::class.java, "barberia_cache").fallbackToDestructiveMigration().build()
     private val productRepo = ProductRepository(db.serviceDao(), db.productDao())
     private val apptRepo = AppointmentRepository()
+    private val blockedSlotService = com.example.service.BlockedSlotService()
     private val settingsRepo = SettingsRepository(db.settingsDao())
     private val authRepo = AuthRepository(application)
 
@@ -100,12 +101,29 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     /** Igual que refreshData() pero awaitable, para pull-to-refresh (sección 1.1). */
     suspend fun refreshDataAwait() = doRefresh()
 
+    private val _cancellationNotice = MutableStateFlow<Appointment?>(null)
+    val cancellationNotice: StateFlow<Appointment?> = _cancellationNotice
+    private val shownCancellationIds = mutableSetOf<Long>()
+
+    fun dismissCancellationNotice() {
+        _cancellationNotice.value?.let { shownCancellationIds.add(it.id) }
+        _cancellationNotice.value = null
+    }
+
     private suspend fun doRefresh() {
         _isLoading.value = true
         val userId = authRepo.userId.first()
         if (userId.isNotEmpty()) {
             val appts = apptRepo.fetchClientAppointments(userId)
             _clientAppointments.value = appts
+            // Turno cancelado por el admin al bloquear un turno/día (sección 6):
+            // avisar con disculpa la primera vez que se detecta, sin repetir.
+            val pending = appts.firstOrNull {
+                it.status == "canceled" && it.cancelReason == "admin_block" && it.id !in shownCancellationIds
+            }
+            if (pending != null && _cancellationNotice.value == null) {
+                _cancellationNotice.value = pending
+            }
         }
         productRepo.refreshServices()
         productRepo.refreshProducts()
@@ -121,7 +139,15 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         _activeSlots.value = SlotSchedule.parseSlotDefinitionsCsv(
             settingsRepo.getSettingValue("slot_definitions", SlotSchedule.slotDefinitionsToCsv(SlotSchedule.DEFAULT_SLOTS))
         )
-        
+
+        // Recién ahora _workingDays refleja la config real (antes de esto, si
+        // el día por defecto era "hoy" y hoy no es laborable, se mostraba como
+        // disponible por error - sección 7). Si el día seleccionado ya no es
+        // válido, saltar automáticamente al próximo día laborable.
+        if (!SlotSchedule.isWorkingDay(_selectedDate.value, _workingDays.value)) {
+            _selectedDate.value = SlotSchedule.findNextValidDay(_selectedDate.value, _workingDays.value)
+        }
+
         _userBirthday.value = authRepo.getCurrentProfile()?.birthday
         fetchDaySlots(_selectedDate.value)
         _isLoading.value = false
@@ -133,11 +159,15 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         fetchDaySlots(date)
     }
 
+    private val _selectedDateBlockedTimes = MutableStateFlow<Set<String>>(emptySet())
+    val selectedDateBlockedTimes: StateFlow<Set<String>> = _selectedDateBlockedTimes
+
     private fun fetchDaySlots(date: String) {
         viewModelScope.launch {
             _isDaySlotsLoading.value = true
             val appts = apptRepo.fetchAppointmentsByDate(date)
             _dayAppointments.value = appts
+            _selectedDateBlockedTimes.value = blockedSlotService.getBlockedSlotsByDate(date).map { it.blockTime }.toSet()
             _isDaySlotsLoading.value = false
         }
     }
@@ -208,6 +238,21 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
                 _bookingError.value = "El número de teléfono debe empezar por 5 y tener 8 dígitos."
                 _isLoading.value = false
                 return@launch
+            }
+
+            // El cliente solo puede tener 1 turno activo a su propio nombre a la
+            // vez: si ya tiene uno pendiente (confirmed/in_progress) sin resolver,
+            // no puede sacar otro hasta que ese se resuelva (venga o no venga).
+            // No aplica a reservas para otra persona (isForOther).
+            if (!isForOther) {
+                val yaTieneActivo = _clientAppointments.value.any {
+                    it.clientId == userId && (it.status == "confirmed" || it.status == "in_progress")
+                }
+                if (yaTieneActivo) {
+                    _bookingError.value = "Ya tienes un turno pendiente. No puedes reservar otro hasta que ese se resuelva."
+                    _isLoading.value = false
+                    return@launch
+                }
             }
 
             val appt = Appointment(
@@ -289,10 +334,18 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** El admin dejó este turno sin disponibilidad (día completo/parcial, sección 5). */
+    fun isSlotBlocked(time: String): Boolean = time.take(5) in _selectedDateBlockedTimes.value
+
     fun getDayStatus(dateStr: String): String { // "green"=free, "red"=full, "gray"=no activity/past/no laborable
         val today = DateFormatter.getTodayDateString()
         if (dateStr < today) return "gray"
         if (!SlotSchedule.isWorkingDay(dateStr, _workingDays.value)) return "gray" // fin de semana / día no laborable
+        // Si es el día que está cargado en _dayAppointments (el seleccionado) y
+        // TODOS sus turnos están bloqueados, se ve igual que un día no laborable.
+        if (dateStr == _selectedDate.value && _activeSlots.value.isNotEmpty() &&
+            _selectedDateBlockedTimes.value.containsAll(_activeSlots.value)
+        ) return "gray"
 
         val dayAppts = _dayAppointments.value.filter { it.appointmentDate == dateStr && it.status != "canceled" }
         val allSlots = _activeSlots.value
