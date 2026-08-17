@@ -142,7 +142,7 @@ fun AdminScheduleScreen(
                 if (slots.isEmpty()) {
                     Text("Sin turnos configurados.", color = MaterialTheme.colorScheme.error)
                 } else {
-                    slots.sorted().forEach { slot ->
+                    SlotSchedule.sortSlots(slots).forEach { slot ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -182,7 +182,7 @@ fun AdminScheduleScreen(
                             !timeRegex.matches(newSlotTime) -> slotError = "Formato inválido"
                             newSlotTime in slots -> slotError = "Ese turno ya existe"
                             else -> {
-                                slots = (slots + newSlotTime).sorted().toMutableList()
+                                slots = SlotSchedule.sortSlots(slots + newSlotTime).toMutableList()
                                 newSlotTime = ""
                                 slotError = null
                             }
