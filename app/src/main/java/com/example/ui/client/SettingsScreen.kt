@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.example.ui.components.PhoneField
 import com.example.utils.Validators
 
+@OptIn(ExperimentalMaterial3Api::class) // <--- AÑADIDO PARA EVITAR EL ERROR DE COMPILACIÓN
 @Composable
 fun SettingsScreen(
     currentPhone: String,
