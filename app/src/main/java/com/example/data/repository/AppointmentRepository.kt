@@ -47,6 +47,17 @@ class AppointmentRepository {
         return res
     }
 
+    /** El cliente cancela su propia reserva (punto 2). */
+    suspend fun clientCancelAppointment(appointmentId: Long, clientUserId: String): Result<Boolean> {
+        val res = appointmentService.clientCancelAppointment(appointmentId, clientUserId)
+        if (res.isSuccess) {
+            _appointments.value = _appointments.value.map {
+                if (it.id == appointmentId) it.copy(status = "canceled", canceledBy = clientUserId) else it
+            }
+        }
+        return res
+    }
+
     suspend fun markAsAttended(appointmentId: Long, adminId: String): Result<Boolean> {
         val res = appointmentService.markAsAttended(appointmentId, adminId)
         if (res.isSuccess) {

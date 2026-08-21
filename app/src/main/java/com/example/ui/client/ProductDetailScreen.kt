@@ -93,7 +93,7 @@ fun ProductDetailScreen(
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = "${product.price} €",
+                    text = com.example.utils.PriceFormatter.format(product.price, product.currency),
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary

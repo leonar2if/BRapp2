@@ -16,6 +16,7 @@ data class Product(
     @ColumnInfo(name = "name") @Json(name = "name") val name: String = "",
     @ColumnInfo(name = "description") @Json(name = "description") val description: String = "",
     @ColumnInfo(name = "price") @Json(name = "price") val price: Double = 0.0,
+    @ColumnInfo(name = "currency") @Json(name = "currency") val currency: String = "MN", // "MN" o "USD"
     @ColumnInfo(name = "image_url1") @Json(name = "image_url1") val imageUrl1: String? = null,
     @ColumnInfo(name = "image_url2") @Json(name = "image_url2") val imageUrl2: String? = null,
     @ColumnInfo(name = "is_active") @Json(name = "is_active") val isActive: Boolean = true,

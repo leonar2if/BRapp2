@@ -160,6 +160,26 @@ class AppointmentService {
         }
     }
 
+    /**
+     * El cliente cancela su propia reserva (punto 2 - regla de 36h la valida
+     * el ViewModel antes de llamar esto). Va directo por PATCH, sin la RPC de
+     * cancelación (esa está pensada para que la use el admin) - depende de la
+     * policy RLS "appointments_client_cancel" que permite a un cliente
+     * actualizar el status a 'canceled' solo en sus propias citas.
+     */
+    suspend fun clientCancelAppointment(appointmentId: Long, clientUserId: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            api.updateAppointment("eq.$appointmentId", mapOf(
+                "status" to "canceled",
+                "canceled_by" to clientUserId,
+                "canceled_at" to DateFormatter.getTodayDateString()
+            ))
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun markAsAttended(appointmentId: Long, adminId: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             try {

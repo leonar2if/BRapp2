@@ -91,6 +91,7 @@ fun AdminCatalogScreen(
         var name by remember { mutableStateOf(editingProduct?.name ?: "") }
         var description by remember { mutableStateOf(editingProduct?.description ?: "") }
         var price by remember { mutableStateOf(editingProduct?.price?.toString() ?: "10.0") }
+        var currency by remember { mutableStateOf(editingProduct?.currency ?: "MN") }
         var isActive by remember { mutableStateOf(editingProduct?.isActive ?: true) }
         // Bytes de la nueva foto elegida (1:1, ya recortada por PhotoPickerField).
         // Si es null y hay editingProduct, se conserva la imageUrl1 existente
@@ -127,11 +128,27 @@ fun AdminCatalogScreen(
                     OutlinedTextField(
                         value = price,
                         onValueChange = { price = it },
-                        label = { Text("Precio (€)") },
+                        label = { Text("Precio") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        FilterChip(
+                            selected = currency == "MN",
+                            onClick = { currency = "MN" },
+                            label = { Text("MN") }
+                        )
+                        FilterChip(
+                            selected = currency == "USD",
+                            onClick = { currency = "USD" },
+                            label = { Text("USD") }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                     PhotoPickerField(
                         existingImageUrl = editingProduct?.imageUrl1,
@@ -160,6 +177,7 @@ fun AdminCatalogScreen(
                                 name = name,
                                 description = description,
                                 price = price.toDoubleOrNull() ?: 10.0,
+                                currency = currency,
                                 imageUrl1 = editingProduct?.imageUrl1, // se sobreescribe con la URL nueva tras subir, si hay foto nueva
                                 isActive = isActive
                             )

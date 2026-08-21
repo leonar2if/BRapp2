@@ -22,21 +22,22 @@ fun TimeSlotWidget(
     isOccupied: Boolean,
     isSelected: Boolean = false,
     isBlocked: Boolean = false, // turno bloqueado por el admin (⊘), sin cita
+    isPast: Boolean = false, // turno de HOY cuya hora ya pasó (punto 3)
     useAbbreviatedLabels: Boolean = false, // true en la vista del cliente: "N.D." en vez de "NO DISPONIBLE" para que quepa
     onClick: () -> Unit
 ) {
-    val effectivelyUnavailable = isOccupied || isBlocked
+    val effectivelyUnavailable = isOccupied || isBlocked || isPast
 
     val borderColor = when {
         isSelected -> MaterialTheme.colorScheme.primary
-        isBlocked -> Color.Gray
+        isPast || isBlocked -> Color.Gray
         isOccupied -> Color(0xFFC62828) // Red
         else -> Color(0xFF2E7D32) // Green
     }
 
     val backgroundColor = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer
-        isBlocked -> Color.Gray.copy(alpha = 0.12f)
+        isPast || isBlocked -> Color.Gray.copy(alpha = 0.12f)
         isOccupied -> Color(0xFFC62828).copy(alpha = 0.1f)
         else -> Color(0xFF2E7D32).copy(alpha = 0.1f)
     }
@@ -76,6 +77,7 @@ fun TimeSlotWidget(
 
             Surface(
                 color = when {
+                    isPast -> Color.Gray
                     isBlocked -> Color.Gray
                     isOccupied -> Color(0xFFC62828)
                     else -> Color(0xFF2E7D32)
@@ -84,6 +86,7 @@ fun TimeSlotWidget(
             ) {
                 Text(
                     text = when {
+                        isPast -> if (useAbbreviatedLabels) "N.D." else "PASADO"
                         isBlocked -> if (useAbbreviatedLabels) "N.D." else "NO DISPONIBLE"
                         isOccupied -> "LLENO"
                         else -> "LIBRE"

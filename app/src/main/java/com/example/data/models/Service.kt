@@ -17,6 +17,7 @@ data class Service(
     @ColumnInfo(name = "duration_minutes") @Json(name = "duration_minutes") val durationMinutes: Int = 30,
     @ColumnInfo(name = "duration_slots") @Json(name = "duration_slots") val durationSlots: Int = 1, // 1=30min, 2=60min
     @ColumnInfo(name = "price") @Json(name = "price") val price: Double = 0.0,
+    @ColumnInfo(name = "currency") @Json(name = "currency") val currency: String = "MN", // "MN" o "USD"
     @ColumnInfo(name = "is_active") @Json(name = "is_active") val isActive: Boolean = true,
     @ColumnInfo(name = "created_at") @Json(name = "created_at") val createdAt: String? = null
 )

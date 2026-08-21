@@ -80,6 +80,22 @@ object DateFormatter {
         }
     }
 
+    /**
+     * Horas (con decimales) desde ahora hasta la fecha+hora del turno.
+     * Negativo si el turno ya pasó. Usado para la regla de cancelación de
+     * 36h del cliente.
+     */
+    fun hoursUntil(dateStr: String, timeStr: String): Double {
+        val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        val target = try {
+            dateTimeFormat.parse("$dateStr ${timeStr.take(5)}")
+        } catch (e: Exception) {
+            null
+        } ?: return Double.MAX_VALUE
+        val diffMillis = target.time - System.currentTimeMillis()
+        return diffMillis / (1000.0 * 60.0 * 60.0)
+    }
+
     fun getNextMonthSameDay(currentDateStr: String): String {
         return try {
             val date = dateFormat.parse(currentDateStr) ?: Date()

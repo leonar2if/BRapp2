@@ -184,9 +184,13 @@ fun AdminTurnScreen(
         val canceled = todayAppts.count { it.status == "canceled" }
         val rescheduled = todayAppts.count { it.isRescheduled }
         val unattended = todayAppts.count { it.status == "confirmed" || it.status == "in_progress" }
-        val estRevenue = todayAppts.filter { it.status == "attended" }.sumOf { appt ->
-            services.find { it.id == appt.serviceId }?.price ?: 15.0
-        }
+        val attendedAppts = todayAppts.filter { it.status == "attended" }
+        val estRevenueMN = attendedAppts.filter { appt ->
+            (services.find { it.id == appt.serviceId }?.currency ?: "MN") == "MN"
+        }.sumOf { appt -> services.find { it.id == appt.serviceId }?.price ?: 15.0 }
+        val estRevenueUSD = attendedAppts.filter { appt ->
+            services.find { it.id == appt.serviceId }?.currency == "USD"
+        }.sumOf { appt -> services.find { it.id == appt.serviceId }?.price ?: 0.0 }
 
         AlertDialog(
             onDismissRequest = { showEndDayDialog = false },
@@ -205,7 +209,11 @@ fun AdminTurnScreen(
                     Text("✅ Atendidos: $attended")
                     Text("❌ Cancelados: $canceled")
                     Text("📅 Reprogramados: $rescheduled")
-                    Text("💰 Ingresos estimados: $estRevenue €", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                    val revenueText = listOfNotNull(
+                        if (estRevenueMN > 0) com.example.utils.PriceFormatter.format(estRevenueMN, "MN") else null,
+                        if (estRevenueUSD > 0) com.example.utils.PriceFormatter.format(estRevenueUSD, "USD") else null
+                    ).joinToString(" + ").ifEmpty { "0 MN" }
+                    Text("💰 Ingresos estimados: $revenueText", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
                 }
             },
             confirmButton = {

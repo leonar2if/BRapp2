@@ -108,7 +108,7 @@ fun ProductCard(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "${product.price} €",
+                    text = com.example.utils.PriceFormatter.format(product.price, product.currency),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.primary
                 )

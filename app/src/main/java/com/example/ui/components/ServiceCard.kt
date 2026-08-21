@@ -76,7 +76,7 @@ fun ServiceCard(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${service.price} €",
+                    text = com.example.utils.PriceFormatter.format(service.price, service.currency),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )

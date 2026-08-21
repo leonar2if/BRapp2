@@ -88,6 +88,7 @@ fun AdminServicesScreen(
         var name by remember { mutableStateOf(editingService?.name ?: "") }
         var durationSlots by remember { mutableStateOf(editingService?.durationSlots ?: 1) }
         var price by remember { mutableStateOf(editingService?.price?.toString() ?: "15.0") }
+        var currency by remember { mutableStateOf(editingService?.currency ?: "MN") }
         var isActive by remember { mutableStateOf(editingService?.isActive ?: true) }
 
         AlertDialog(
@@ -130,11 +131,28 @@ fun AdminServicesScreen(
                     OutlinedTextField(
                         value = price,
                         onValueChange = { price = it },
-                        label = { Text("Precio (€)") },
+                        label = { Text("Precio") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        FilterChip(
+                            selected = currency == "MN",
+                            onClick = { currency = "MN" },
+                            label = { Text("MN") }
+                        )
+                        FilterChip(
+                            selected = currency == "USD",
+                            onClick = { currency = "USD" },
+                            label = { Text("USD") }
+                        )
+                    }
 
                     if (editingService != null) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -160,6 +178,7 @@ fun AdminServicesScreen(
                                 durationMinutes = durMins,
                                 durationSlots = durationSlots,
                                 price = price.toDoubleOrNull() ?: 15.0,
+                                currency = currency,
                                 isActive = isActive
                             )
                             viewModel.saveService(s)

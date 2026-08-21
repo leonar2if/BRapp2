@@ -53,6 +53,18 @@ fun BookAppointmentScreen(
     val lastBooked by viewModel.lastBookedAppointment.collectAsState()
     val error by viewModel.bookingError.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val cancelError by viewModel.cancelError.collectAsState()
+
+    if (cancelError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCancelError() },
+            title = { Text("No se pudo cancelar") },
+            text = { Text(cancelError!!) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissCancelError() }) { Text("Entendido") }
+            }
+        )
+    }
 
     /*
      * IMPORTANTE:
@@ -198,11 +210,40 @@ fun BookAppointmentScreen(
                                     ?.name
                                     ?: "Servicio de Barbería"
 
+                            var showCancelConfirm by remember(appt.id) { mutableStateOf(false) }
+
                             AppointmentCard(
                                 appointment = appt,
                                 serviceName = serviceName,
-                                isAdmin = false
+                                isAdmin = false,
+                                onCancelClick = if (viewModel.canCancelAppointment(appt)) {
+                                    { showCancelConfirm = true }
+                                } else null
                             )
+
+                            if (showCancelConfirm) {
+                                AlertDialog(
+                                    onDismissRequest = { showCancelConfirm = false },
+                                    title = { Text("¿Cancelar turno?") },
+                                    text = { Text("Vas a cancelar tu turno del ${DateFormatter.formatDateForDisplay(appt.appointmentDate)} a las ${DateFormatter.formatTimeForDisplay(appt.appointmentTime)}.") },
+                                    confirmButton = {
+                                        Button(
+                                            onClick = {
+                                                viewModel.cancelMyAppointment(appt)
+                                                showCancelConfirm = false
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                        ) {
+                                            Text("Sí, cancelar")
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showCancelConfirm = false }) {
+                                            Text("Volver")
+                                        }
+                                    }
+                                )
+                            }
                         }
 
                         item {
@@ -317,16 +358,19 @@ fun BookAppointmentScreen(
                                                 )
                                             val isBlocked =
                                                 viewModel.isSlotBlocked(slot)
+                                            val isPast =
+                                                viewModel.isSlotPast(slot)
 
                                             TimeSlotWidget(
                                                 time = slot,
                                                 isOccupied = isOccupied,
                                                 isBlocked = isBlocked,
+                                                isPast = isPast,
                                                 isSelected =
                                                     selectedTime == slot,
                                                 useAbbreviatedLabels = true,
                                                 onClick = {
-                                                    if (!isBlocked) {
+                                                    if (!isBlocked && !isPast) {
                                                         viewModel.selectTime(
                                                             slot
                                                         )
@@ -492,8 +536,8 @@ fun BookAppointmentScreen(
 
                                 Text(
                                     text = "💰 Precio: ${
-                                        selectedService?.price
-                                    } €",
+                                        selectedService?.let { com.example.utils.PriceFormatter.format(it.price, it.currency) } ?: ""
+                                    }",
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         fontWeight = FontWeight.Bold
                                     )

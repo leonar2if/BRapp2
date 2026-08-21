@@ -61,6 +61,34 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     private val _bookingError = MutableStateFlow<String?>(null)
     val bookingError: StateFlow<String?> = _bookingError
 
+    private val _cancelError = MutableStateFlow<String?>(null)
+    val cancelError: StateFlow<String?> = _cancelError
+
+    /** true si todavía se puede cancelar (más de 36h de anticipación). Punto 2. */
+    fun canCancelAppointment(appointment: Appointment): Boolean {
+        if (appointment.status != "confirmed" && appointment.status != "in_progress") return false
+        return DateFormatter.hoursUntil(appointment.appointmentDate, appointment.appointmentTime) > 36.0
+    }
+
+    fun cancelMyAppointment(appointment: Appointment) {
+        viewModelScope.launch {
+            if (!canCancelAppointment(appointment)) {
+                _cancelError.value = "Ya no se puede cancelar: faltan 36 horas o menos para el turno."
+                return@launch
+            }
+            val userId = authRepo.userId.first()
+            val res = apptRepo.clientCancelAppointment(appointment.id, userId)
+            if (res.isFailure) {
+                _cancelError.value = ErrorTranslator.toHumanMessage(res.exceptionOrNull())
+            }
+            refreshData()
+        }
+    }
+
+    fun dismissCancelError() {
+        _cancelError.value = null
+    }
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
@@ -337,10 +365,19 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     /** El admin dejó este turno sin disponibilidad (día completo/parcial, sección 5). */
     fun isSlotBlocked(time: String): Boolean = time.take(5) in _selectedDateBlockedTimes.value
 
+    /** Turno de HOY cuya hora ya pasó - no se puede reservar (punto 3). */
+    fun isSlotPast(time: String): Boolean {
+        if (_selectedDate.value != DateFormatter.getTodayDateString()) return false
+        return time.take(5) <= DateFormatter.getNowTimeString()
+    }
+
     fun getDayStatus(dateStr: String): String { // "green"=free, "red"=full, "gray"=no activity/past/no laborable
         val today = DateFormatter.getTodayDateString()
         if (dateStr < today) return "gray"
         if (!SlotSchedule.isWorkingDay(dateStr, _workingDays.value)) return "gray" // fin de semana / día no laborable
+        if (dateStr == today && _activeSlots.value.isNotEmpty() &&
+            _activeSlots.value.all { it <= DateFormatter.getNowTimeString() }
+        ) return "gray" // ya pasaron todos los turnos de hoy
         // Si es el día que está cargado en _dayAppointments (el seleccionado) y
         // TODOS sus turnos están bloqueados, se ve igual que un día no laborable.
         if (dateStr == _selectedDate.value && _activeSlots.value.isNotEmpty() &&
